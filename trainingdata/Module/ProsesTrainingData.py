@@ -1,4 +1,3 @@
-
 import re
 import sys
 import csv
@@ -22,8 +21,51 @@ from nltk.corpus import stopwords
 from Sastrawi.Stemmer.StemmerFactory import StemmerFactory
 from sklearn.feature_extraction.text import TfidfVectorizer
 
+from pyswarm import pso
+
+positive = 'positif'
+negative = 'negative'
+neutral = 'neutral'
+
+stopwords = None
+
+featurelist = {
+            positive : [], 
+            negative : [],
+            neutral : []
+            }
+document = {
+            positive : [], 
+            negative : [],
+            neutral : []
+            }
+tfidfresult = {
+            positive : [], 
+            negative : [],
+            neutral : []
+            }
+
+tfidfweight = {
+            positive : [], 
+            negative : [],
+            neutral : []
+            }
+
+particle = {
+            positive : [], 
+            negative : [],
+            neutral : []
+            }
+
+x1 = []
+x2 = []
+
+label = []
+
+clf = None
 
 class TrainingData:
+
     def __init__(self):
        self.runProcessTraining()
 
@@ -125,41 +167,34 @@ class TrainingData:
         tmpTfidf = vectorizer.fit_transform(tweet)
 
         return tmpTfidf
-    
+
+    def persamaanSVM(self, X):
+        global clf
+        return clf.predict_log_proba(X)
+
+    # run program pemanggilan data
     def runProcessTraining(self):
-        positive = 'positif'
-        negative = 'negative'
-        neutral = 'neutral'
+        global positive
+        global negative
+        global neutral
+
+        global featurelist
+        global document
+        global tfidfresult
+        global tfidfweight
+        global particle
+
+        global x1
+        global x2
+
+        global label
+
+        global clf
+
+        global stopwords
 
         st = open('data/feature_list/id-stopwords.txt', 'r')
         stopWords = self.getStopWordList('data/feature_list/id-stopwords.txt')
-
-        featurelist = {
-            positive : [], 
-            negative : [],
-            neutral : []
-            }
-        document = {
-            positive : [], 
-            negative : [],
-            neutral : []
-            }
-        tfidfresult = {
-            positive : [], 
-            negative : [],
-            neutral : []
-            }
-
-        tfidfweight = {
-            positive : [], 
-            negative : [],
-            neutral : []
-            }
-
-        x1 = []
-        x2 = []
-
-        label = []
 
         tfidfDocument = tfidf.TfIdf()
 
@@ -193,7 +228,7 @@ class TrainingData:
 
                 featurelist['positif'] = list(set(featurelist['positif']))
 
-                label.append(1)
+                label.append(positive)
 
             if (sentiment == 'negative' ):
                 document['negative'].append(tweet)
@@ -203,7 +238,7 @@ class TrainingData:
 
                 featurelist['negative'] = list(set(featurelist['negative']))
 
-                label.append(-1)
+                label.append(negative)
 
             if (sentiment == 'neutral' ):
                 document['neutral'].append(tweet)
@@ -213,9 +248,9 @@ class TrainingData:
 
                 featurelist['neutral'] = list(set(featurelist['neutral']))
 
-                label.append(0)
+                label.append(neutral)
         
-        
+        # mendapatkan pembobotan menggunakan tf idf
         for i, feature in enumerate(featurelist):
             print("generating tf idf per feature : ", feature)
             tfidfresult[feature] = tfidfDocument.similarities(featurelist[feature])
@@ -226,27 +261,55 @@ class TrainingData:
             print(tfidfresult[feature])
             print(tfidfweight[feature])
 
-            print('\n\n\n')
+            print('\n\n')
 
      
         # merubah ke variable yang bisa diterima oleh svm
         for i, row in enumerate(tfidfweight[positive]):
             a = [tfidfresult[positive][i][1],tfidfresult[negative][i][1], tfidfresult[neutral][i][1]]
 
+            particle[label[i]].append(a)
+
             x1.append(a)
 
-        print(x1)
+        # print(x1)
 
         X = x1
         y = label
 
-        clf = svm.SVC(kernel='linear', C = 1.0, decision_function_shape='ovo')
+        #clf = svm.SVC(kernel='linear', C = 1.0, decision_function_shape='ovo')
+        clf = svm.SVC(kernel = 'linear', probability = True, decision_function_shape = 'ovr')
         clf.fit(X,y)
-        
-        print(clf.predict([1.2828054298642533, 0.12362637362637363, 0.04013377926421405]))
-        print(clf.predict([10.58,10.76,0.04013377926421405]))
+
+        for i, x in enumerate(particle):
+            print(i)
+            print(particle[x])
+
+            lb = []
+
+            for i in particle[x]:
+                tmp = []
+                for a in i:
+                    tmp.append(-1)
+                lb.append(tmp)
+
+            print(lb)
+            print(pso(self.persamaanSVM, lb, particle[x]))
+
+        ''''
+        a = x1
+        print(clf.classes_)
+
+        dicision = self.persamaanSVM(a)
+        #dicision = clf.predict_proba(a)
+        print(dicision)
+        print(clf.predict(a))
+
+        #print(clf.predict([10.58,10.76,0.04013377926421405]))
+        #print(clf.predict([0, 0.09126984126984126,  1.3140096618357489]))
+        #print(clf.get_params())
         w = clf.coef_[0]
-        print(w)
+        #print(w)
 
         a = -w[0] / w[1]
 
@@ -255,9 +318,13 @@ class TrainingData:
 
         h0 = plt.plot(xx, yy, 'k-', label="non weighted div")
 
-       # plt.scatter(X[:, 0], X[:, 1], c = y)
-       # plt.legend()
-       # plt.show()
+        #'''
+
+'''
+        plt.scatter(X[:, 0], X[:, 1], c = y)
+        plt.legend()
+        plt.show()
 
 
 
+'''
