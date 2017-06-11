@@ -4,16 +4,17 @@ import csv
 import math
 import os
 import pickle
+import copy
+import multiprocessing as Pool
+
+from PyQt5.QtWidgets import QListWidget
 
 import numpy as np
 import matplotlib.pyplot as plt
 
-from matplotlib import style
-
-style.use("ggplot")
-
 from sklearn import svm
 from Utility import tfidf
+from Utility import Particle
 
 from nltk.tokenize import TweetTokenizer
 from nltk.corpus import stopwords
@@ -23,7 +24,10 @@ from sklearn.feature_extraction.text import TfidfVectorizer
 
 from pyswarm import pso
 
-positive = 'positif'
+from matplotlib import style
+style.use("ggplot")
+
+positive = 'positive'
 negative = 'negative'
 neutral = 'neutral'
 
@@ -66,8 +70,17 @@ clf = None
 
 class TrainingData:
 
-    def __init__(self):
-       self.runProcessTraining()
+    def __init__(self, tweet, stopword, qlistwidget = None):
+       self.st = open(stopword, 'r')
+       self.stopWords = self.getStopWordList(stopword)
+
+       #Read the tweets one by one and process it
+       ##inpTweets = csv.reader(open('data/sampleTweets.csv', 'rb'), delimiter=',', quotechar='|')
+
+       csvfile = open(tweet, "r")
+       self.inpTweets = csv.reader(csvfile)
+
+       self.list = qlistwidget
 
     #start getStopWordList
     def getStopWordList(self,stopWordListFileName):
@@ -129,8 +142,8 @@ class TrainingData:
         return tweet
     #akhir
 
+    #emlalkukan preprocessing t4erhadap data yang digunakan
     def preprocessingData(self,tweet, stopwords):
-
         # mempersiapkan varible pembantu
         featureList = []
         tmpFeature = []
@@ -168,57 +181,114 @@ class TrainingData:
 
         return tmpTfidf
 
+    #persamaan svm untuk melakukan predik
     def persamaanSVM(self, X):
-        global clf
-        return clf.predict_log_proba(X)
+        return self.clf.predict_log_proba(X)
+
+    #menyimpan mode4l presintence dari svm untuk dilakukan testing di website
+    def exportModel(self,filename):
+        pickle.dump(self.svm, open(filename, 'wb'))
+
+    #function untuk menjalankan pso
+    def runpso(self, particles,label):
+        swarm = {
+            positive : [], 
+            negative : [],
+            neutral : []
+            }
+
+        temp = []
+
+        #preparing data for pso particle, append in one variable particle pso
+        for index, value in enumerate(particles):
+            partic = Particle.Particle(particles[index], index, self.clf, [i for i, no in enumerate(self.clf.classes_) if no == label[index]], self.clf.class_weight_)
+            swarm[label[index]].append(partic)
+            temp.append(partic)
+
+        for step in range(10):
+            print("---Itteration " + str(step) + "---")
+
+            hasilkedua = self.pso(swarm)
+
+            svmPertama = copy.deepcopy(self.svmStandard)
+            svmPertama.fit(self.X, self.y)
+
+            svmKedua = copy.deepcopy(self.svmStandard)
+            svmKedua.fit(hasilkedua, self.y)
+
+            print(svmKedua.score(self.x1, self.y))
+            print(svmPertama.score(self.x1, self.y))
+
+            #perbandingan akurasi pada kedua svm memiliki akurasi dibandingkan sebelumnya atau tidak
+            if svmKedua.score(self.x1, self.y) > svmPertama.score(self.x1,self.y):
+                self.X = copy.deepcopy( hasilkedua)
+                print(svmKedua.score(self.x1, self.y) > svmPertama.score(self.x1,self.y))
+
+            
+
+    def pso(self, swarm):
+        #do pso litetation 
+        temp = copy.deepcopy(self.X)
+
+        # perubahan particle berdasarkan feature mereka
+        for indexswarm, valueswarm in enumerate(swarm):
+            #persiapan variable yang digunakan untuk keperluan pso
+            swarm[valueswarm] = sorted(swarm[valueswarm])
+            indexvalue = [i for i, no in enumerate(self.clf.classes_) if no == valueswarm]
+            weight = self.clf.class_weight_[indexvalue][0]
+
+            gbest = 0
+
+            #penentuan gbest bedasarkan hasil dari akumulasi persamaan svm
+            for indexpbest, particlepbest in enumerate( swarm[valueswarm]):
+                pbest = self.clf.decision_function(particlepbest.position)[0][indexvalue]
+                if pbest >= gbest :
+                    gbest = pbest
+                    globalBest = swarm[valueswarm][indexpbest]  
+                    self.solution = globalBest
+
+            #perubahan pada particle swarm
+            for particle in swarm[valueswarm]:
+                particle.updateParticle(globalBest.getPositionList(), weight)
+                
+            swarm[valueswarm] = sorted(swarm[valueswarm])
+            
+            #Print swarm
+            for particle in swarm[valueswarm]:     
+                temp[particle.index] = particle.position
+
+        return temp
+
 
     # run program pemanggilan data
-    def runProcessTraining(self):
+    def run(self):
         global positive
         global negative
         global neutral
 
-        global featurelist
-        global document
-        global tfidfresult
-        global tfidfweight
-        global particle
-
-        global x1
-        global x2
-
-        global label
-
-        global clf
-
-        global stopwords
-
-        st = open('data/feature_list/id-stopwords.txt', 'r')
-        stopWords = self.getStopWordList('data/feature_list/id-stopwords.txt')
-
-        tfidfDocument = tfidf.TfIdf()
-
-        #Read the tweets one by one and process it
-        ##inpTweets = csv.reader(open('data/sampleTweets.csv', 'rb'), delimiter=',', quotechar='|')
-
-        csvfile = open('data/sampleTweets.csv', "r")
-        inpTweets = csv.reader(csvfile)
         tweets = []
 
+        self.x1 = []
+        self.svmStandard = svm.SVC(kernel = 'linear', probability = True, decision_function_shape = 'ovr')
+        self.tfidfDocument = tfidf.TfIdf()
+
         # start loop
-        for i, row in enumerate(inpTweets):
+        for i, row in enumerate(self.inpTweets):
             sentiment = row[0].replace('|','')
             tweet = row[1].replace('|', '')
-            
-            print("preprocessing data ke ", i," tweet : ", tweet)
+
+            #'''
+            if self.list != None :
+                self.list.addItem(''.join(["preprocessing data ke ", str(i)," tweet : ", tweet]))
+            #'''
 
             #tahap preprocessing
             processedTweet = self.processTweet(tweet)
-            featureVector = self.preprocessingData(processedTweet, stopWords)
+            featureVector = self.preprocessingData(processedTweet, self.stopWords)
             tweets.append((featureVector, sentiment))
 
              # tahap binary
-            tfidfDocument.add_document(i,featureVector)
+            self.tfidfDocument.add_document(i,featureVector)
 
             if (sentiment == 'positive' ):
                 document['positif'].append(tweet)
@@ -260,9 +330,6 @@ class TrainingData:
 
             print(tfidfresult[feature])
             print(tfidfweight[feature])
-
-            print('\n\n')
-
      
         # merubah ke variable yang bisa diterima oleh svm
         for i, row in enumerate(tfidfweight[positive]):
@@ -270,31 +337,39 @@ class TrainingData:
 
             particle[label[i]].append(a)
 
-            x1.append(a)
+            self.x1.append(a)
 
         # print(x1)
 
-        X = x1
-        y = label
-
+        self.X = copy.deepcopy(self.x1)
+        self.y = label
+        
         #clf = svm.SVC(kernel='linear', C = 1.0, decision_function_shape='ovo')
-        clf = svm.SVC(kernel = 'linear', probability = True, decision_function_shape = 'ovr')
-        clf.fit(X,y)
+        self.clf = copy.deepcopy(self.svmStandard)
+        self.clf.fit(self.X,self.y)
 
-        for i, x in enumerate(particle):
-            print(i)
-            print(particle[x])
+        #run pso
+        self.runpso(self.x1, self.y)
 
-            lb = []
+        self.svm = copy.deepcopy(self.svmStandard)
+        self.svm.fit(self.X, self.y)
 
-            for i in particle[x]:
-                tmp = []
-                for a in i:
-                    tmp.append(-1)
-                lb.append(tmp)
+        print(self.clf.decision_function(self.x1))
+        print(self.clf.predict(self.x1))
+        print(self.clf.support_vectors_ )
+        print(self.clf.score(self.x1, self.y))
+        
+        print(self.svm.decision_function(self.x1))
+        print(self.svm.predict(self.x1))
+        print(self.svm.support_vectors_ )
+        print(self.svm.score(self.x1, self.y))
 
-            print(lb)
-            print(pso(self.persamaanSVM, lb, particle[x]))
+        self.exportModel('modelterbaru.sav')
+        
+        #'''
+        if self.list != None :
+            self.list.addItem(''.join(['Selesai training model disimpan dalam ', os.path.dirname(__file__) , 'modelterbaru.csv']))
+        #'''
 
         ''''
         a = x1

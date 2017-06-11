@@ -12,7 +12,7 @@
     <OutputPath>.</OutputPath>
     <Name>TrainingData</Name>
     <RootNamespace>trainingdata</RootNamespace>
-    <IsWindowsApplication>False</IsWindowsApplication>
+    <IsWindowsApplication>True</IsWindowsApplication>
     <InterpreterId>Global|PythonCore|3.6</InterpreterId>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)' == 'Debug' ">
@@ -36,6 +36,8 @@
     <Compile Include="sampleTweet.txt">
       <SubType>Code</SubType>
     </Compile>
+    <Compile Include="Utility\PSO.py" />
+    <Compile Include="Utility\Particle.py" />
     <Compile Include="Utility\tfidf.py" />
     <Compile Include="trainingdata.py" />
     <Compile Include="Utility\__init__.py">
