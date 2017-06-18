@@ -12,7 +12,7 @@
     <OutputPath>.</OutputPath>
     <Name>TrainingData</Name>
     <RootNamespace>trainingdata</RootNamespace>
-    <IsWindowsApplication>True</IsWindowsApplication>
+    <IsWindowsApplication>False</IsWindowsApplication>
     <InterpreterId>Global|PythonCore|3.6</InterpreterId>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)' == 'Debug' ">

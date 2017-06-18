@@ -9,7 +9,7 @@
 import sys
 from PyQt5.QtWidgets import *
 from PyQt5.QtGui import QIcon
-from PyQt5.QtCore import pyqtSlot
+from PyQt5.QtCore import pyqtSlot, QThread, pyqtSignal
 import multiprocessing
 
 import threading
@@ -20,7 +20,7 @@ class App(QWidget):
  
     def __init__(self):
         super().__init__()
-        self.title = 'PyQt5 file dialogs - pythonspot.com'
+        self.title = 'Training data Twitter'
         self.left = 10
         self.top = 10
         self.width = 640
@@ -31,22 +31,22 @@ class App(QWidget):
         self.setWindowTitle(self.title)
         self.center()
         self.setFixedSize(700 ,700)  
-      
-        self.listview = QListWidget(self)
-        self.listview.resize(700 - 20, 700 - 20 - 60)
-        self.listview.move(10,10)
  
         button = QPushButton('Import File', self)
         button.setToolTip('This is an example button')
         button.resize(200, 40)
-        button.move(10,700 - 10 - 40) 
+        button.move(10, self.frameGeometry().height() - button.frameGeometry().height() - 10) 
         button.clicked.connect(self.on_click)
 
         button_run = QPushButton('Run', self)
         button_run.setToolTip('Menjalankan program training data')
-        button_run.resize(200, 40)
-        button_run.move(700 - 200 - 10, 700 - 10 - 40) 
+        button_run.resize(button.frameGeometry().width(), button.frameGeometry().height())
+        button_run.move(self.frameGeometry().width() - button_run.frameGeometry().width() - 10, button.frameGeometry().y()) 
         button_run.clicked.connect(self.on_click_run)
+
+        self.listview = QListWidget(self)
+        self.listview.move(10,10)
+        self.listview.resize(self.frameGeometry().width() - 20, button.frameGeometry().y() - self.listview.frameGeometry().y() - 10)
     
         self.show()
 
@@ -60,15 +60,18 @@ class App(QWidget):
     @pyqtSlot()
     def on_click(self):
         filename = self.openFileNameDialog()
+        QMessageBox.question(self, "Pesan", "Anda telah memilih file Training, sekarang anda memilih file stopword", QMessageBox.Yes)
         stopword = self.openFileStopword()
+        QMessageBox.question(self, "Pesan", "Anda telah memilih file Stopwords, sekarang data telah siap untuk ditraining", QMessageBox.Yes)
 
         if filename: 
-            self.trainingdata = ProsesTrainingData.TrainingData(filename, stopword, self.listview)
+            self.threadTrainingData = ThreadTrainingData(filename, stopword)
+            self.threadTrainingData.update.connect(self.insertStrListView)
             self.listview.addItem("sukses masukan data")
 
     @pyqtSlot()
     def on_click_run(self):
-        #self.trainingdata.run()
+        self.threadTrainingData.start()
         return
  
     def openFileNameDialog(self):    
@@ -85,4 +88,29 @@ class App(QWidget):
         if fileName:
             return fileName
 
+    def insertStrListView(self, message):
+        self.listview.addItem(message)
+        return 
 
+class ThreadCl(QThread):
+    def __init__(self):
+        return
+
+
+class ThreadTrainingData(QThread):
+    update = pyqtSignal(str)
+    finish = pyqtSignal()
+
+    def __init__(self, filename, stopword):
+        QThread.__init__(self)
+        self.filename = filename
+        self.stopword = stopword
+        self.trainingdata = ProsesTrainingData.TrainingData(filename, stopword)
+        self.trainingdata.update = self.update
+
+    def __del__(self):
+        self.wait()
+
+    def run(self):
+        self.trainingdata.run()
+        #return super().run()

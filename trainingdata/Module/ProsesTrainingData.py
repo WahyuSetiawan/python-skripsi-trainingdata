@@ -6,8 +6,10 @@ import os
 import pickle
 import copy
 import multiprocessing as Pool
+import warnings
 
 from PyQt5.QtWidgets import QListWidget
+from PyQt5.QtCore import pyqtSignal
 
 import numpy as np
 import matplotlib.pyplot as plt
@@ -69,6 +71,7 @@ label = []
 clf = None
 
 class TrainingData:
+    update = pyqtSignal(str)
 
     def __init__(self, tweet, stopword, qlistwidget = None):
        self.st = open(stopword, 'r')
@@ -81,6 +84,8 @@ class TrainingData:
        self.inpTweets = csv.reader(csvfile)
 
        self.list = qlistwidget
+
+       warnings.filterwarnings("ignore", category=DeprecationWarning)
 
     #start getStopWordList
     def getStopWordList(self,stopWordListFileName):
@@ -186,7 +191,16 @@ class TrainingData:
         return self.clf.predict_log_proba(X)
 
     #menyimpan mode4l presintence dari svm untuk dilakukan testing di website
-    def exportModel(self,filename):
+    def exportModel(self,filename, featurelist):
+        with open('featurelist.txt', 'a') as f:
+            
+            for i, feature in enumerate(featurelist):
+                self.cetak(feature)
+                for a in featurelist[feature]:
+                    self.cetak(a)
+                    f.write(''.join([a,",", feature]))
+                    f.write("\n")
+                
         pickle.dump(self.svm, open(filename, 'wb'))
 
     #function untuk menjalankan pso
@@ -205,7 +219,7 @@ class TrainingData:
             swarm[label[index]].append(partic)
             temp.append(partic)
 
-        for step in range(10):
+        for step in range(20):
             print("---Itteration " + str(step) + "---")
 
             hasilkedua = self.pso(swarm)
@@ -216,15 +230,9 @@ class TrainingData:
             svmKedua = copy.deepcopy(self.svmStandard)
             svmKedua.fit(hasilkedua, self.y)
 
-            print(svmKedua.score(self.x1, self.y))
-            print(svmPertama.score(self.x1, self.y))
-
             #perbandingan akurasi pada kedua svm memiliki akurasi dibandingkan sebelumnya atau tidak
             if svmKedua.score(self.x1, self.y) > svmPertama.score(self.x1,self.y):
-                self.X = copy.deepcopy( hasilkedua)
-                print(svmKedua.score(self.x1, self.y) > svmPertama.score(self.x1,self.y))
-
-            
+                self.X = copy.deepcopy( hasilkedua)        
 
     def pso(self, swarm):
         #do pso litetation 
@@ -259,7 +267,6 @@ class TrainingData:
 
         return temp
 
-
     # run program pemanggilan data
     def run(self):
         global positive
@@ -269,7 +276,11 @@ class TrainingData:
         tweets = []
 
         self.x1 = []
-        self.svmStandard = svm.SVC(kernel = 'linear', probability = True, decision_function_shape = 'ovr')
+        self.svmStandard = svm.SVC(C=1.0, cache_size=200, class_weight=None, coef0=0.0,
+            decision_function_shape="ovr", degree=3, gamma='auto', kernel='linear',
+            max_iter=-1, probability=False, random_state=None, shrinking=True,
+            tol=0.001, verbose=False)
+
         self.tfidfDocument = tfidf.TfIdf()
 
         # start loop
@@ -277,10 +288,7 @@ class TrainingData:
             sentiment = row[0].replace('|','')
             tweet = row[1].replace('|', '')
 
-            #'''
-            if self.list != None :
-                self.list.addItem(''.join(["preprocessing data ke ", str(i)," tweet : ", tweet]))
-            #'''
+            self.cetak(''.join(["preprocessing data ke ", str(i)," tweet : ", tweet]))
 
             #tahap preprocessing
             processedTweet = self.processTweet(tweet)
@@ -290,40 +298,40 @@ class TrainingData:
              # tahap binary
             self.tfidfDocument.add_document(i,featureVector)
 
-            if (sentiment == 'positive' ):
-                document['positif'].append(tweet)
+            if (sentiment == positive ):
+                document[positive].append(tweet)
 
                 for feature in featureVector:
-                    featurelist['positif'].append(feature)
+                    featurelist[positive].append(feature)
 
-                featurelist['positif'] = list(set(featurelist['positif']))
+                featurelist[positive] = list(set(featurelist[positive]))
 
                 label.append(positive)
 
-            if (sentiment == 'negative' ):
-                document['negative'].append(tweet)
+            if (sentiment == negative ):
+                document[negative].append(tweet)
 
                 for feature in featureVector:
-                   featurelist['negative'].append(feature)
+                   featurelist[negative].append(feature)
 
-                featurelist['negative'] = list(set(featurelist['negative']))
+                featurelist[negative] = list(set(featurelist[negative]))
 
                 label.append(negative)
 
-            if (sentiment == 'neutral' ):
-                document['neutral'].append(tweet)
+            if (sentiment == neutral ):
+                document[neutral].append(tweet)
 
                 for feature in featureVector:
-                   featurelist['neutral'].append(feature)
+                   featurelist[neutral].append(feature)
 
-                featurelist['neutral'] = list(set(featurelist['neutral']))
+                featurelist[neutral] = list(set(featurelist[neutral]))
 
                 label.append(neutral)
         
         # mendapatkan pembobotan menggunakan tf idf
         for i, feature in enumerate(featurelist):
-            print("generating tf idf per feature : ", feature)
-            tfidfresult[feature] = tfidfDocument.similarities(featurelist[feature])
+            #self.cetak("generating tf idf per feature : ".join(feature))
+            tfidfresult[feature] = self.tfidfDocument.similarities(featurelist[feature])
             
             for x in tfidfresult[feature]:
                 tfidfweight[feature].append(x[1])
@@ -334,18 +342,20 @@ class TrainingData:
         # merubah ke variable yang bisa diterima oleh svm
         for i, row in enumerate(tfidfweight[positive]):
             a = [tfidfresult[positive][i][1],tfidfresult[negative][i][1], tfidfresult[neutral][i][1]]
-
-            particle[label[i]].append(a)
-
             self.x1.append(a)
+            print(a)
 
-        # print(x1)
+        #print(self.x1)
+        self.cetak('perhitungan svm dilanjutkan dengan perhitungan pso')
 
         self.X = copy.deepcopy(self.x1)
         self.y = label
         
-        #clf = svm.SVC(kernel='linear', C = 1.0, decision_function_shape='ovo')
-        self.clf = copy.deepcopy(self.svmStandard)
+        self.clf =  svm.SVC(C=1.0, cache_size=200, class_weight=None, coef0=0.0,
+            decision_function_shape="ovr", degree=3, gamma='auto', kernel='linear',
+            max_iter=-1, probability=True, random_state=None, shrinking=True,
+            tol=0.001, verbose=True)
+        #self.clf = copy.deepcopy(self.svmStandard)
         self.clf.fit(self.X,self.y)
 
         #run pso
@@ -353,25 +363,31 @@ class TrainingData:
 
         self.svm = copy.deepcopy(self.svmStandard)
         self.svm.fit(self.X, self.y)
+        asss = self.clf.decision_function(self.x1)
 
-        print(self.clf.decision_function(self.x1))
+        print(asss.shape)
+        print(self.clf.class_weight_)
         print(self.clf.predict(self.x1))
-        print(self.clf.support_vectors_ )
+        print(self.clf.support_ )
         print(self.clf.score(self.x1, self.y))
+        print(self.clf.classes_)
+        print(self.clf.support_vectors_)
+        print("cofisien for svm :")
+        print(self.clf.coef_)
+        print("dual cofisien for svm :")
+        print(self.clf.dual_coef_)
+        
         
         print(self.svm.decision_function(self.x1))
         print(self.svm.predict(self.x1))
         print(self.svm.support_vectors_ )
         print(self.svm.score(self.x1, self.y))
 
-        self.exportModel('modelterbaru.sav')
-        
-        #'''
-        if self.list != None :
-            self.list.addItem(''.join(['Selesai training model disimpan dalam ', os.path.dirname(__file__) , 'modelterbaru.csv']))
-        #'''
+        self.exportModel('modelterbaru.pkl', featurelist)
 
-        ''''
+        self.cetak(''.join(['Selesai training model disimpan dalam ', os.path.dirname(__file__) , 'modelterbaru.pkl']))
+
+        '''
         a = x1
         print(clf.classes_)
 
@@ -395,6 +411,9 @@ class TrainingData:
 
         #'''
 
+    def cetak(self, pesan):
+        print(pesan)
+        self.update.emit(pesan)
 '''
         plt.scatter(X[:, 0], X[:, 1], c = y)
         plt.legend()
