@@ -15,8 +15,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 from sklearn import svm
-from Utility import tfidf
-from Utility import Particle
+from Utility import tfidf, Particle
 
 from nltk.tokenize import TweetTokenizer
 from nltk.corpus import stopwords
@@ -201,7 +200,7 @@ class TrainingData:
                     f.write(''.join([a,",", feature]))
                     f.write("\n")
                 
-        pickle.dump(self.svm, open(filename, 'wb'))
+        pickle.dump(self.clf, open(filename, 'wb'))
 
     #function untuk menjalankan pso
     def runpso(self, particles,label):
