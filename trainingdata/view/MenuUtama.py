@@ -6,7 +6,7 @@
 #
 # WARNING! All changes made in this file will be lost!
 
-import sys
+import sys, os
 from PyQt5.QtWidgets import *
 from PyQt5.QtGui import QIcon
 from PyQt5.QtCore import pyqtSlot, QThread, pyqtSignal
@@ -33,7 +33,7 @@ class App(QWidget):
         self.setFixedSize(700 ,700)  
  
         button = QPushButton('Import File', self)
-        button.setToolTip('This is an example button')
+        button.setToolTip('Untuk memilih file yang akan dipilih')
         button.resize(200, 40)
         button.move(10, self.frameGeometry().height() - button.frameGeometry().height() - 10) 
         button.clicked.connect(self.on_click)
@@ -61,13 +61,16 @@ class App(QWidget):
     def on_click(self):
         filename = self.openFileNameDialog()
         QMessageBox.question(self, "Pesan", "Anda telah memilih file Training, sekarang anda memilih file stopword", QMessageBox.Yes)
+        self.insertStrListView("".join(["Data training yang digunakan : ", filename]))
+
         stopword = self.openFileStopword()
         QMessageBox.question(self, "Pesan", "Anda telah memilih file Stopwords, sekarang data telah siap untuk ditraining", QMessageBox.Yes)
+        self.insertStrListView("".join(["File stopword yang digunakan : ", stopword]))
 
         if filename: 
             self.threadTrainingData = ThreadTrainingData(filename, stopword)
             self.threadTrainingData.update.connect(self.insertStrListView)
-            self.listview.addItem("sukses masukan data")
+            self.listview.addItem("Data training telah dimaukan, training data telah siap")
 
     @pyqtSlot()
     def on_click_run(self):
@@ -92,11 +95,6 @@ class App(QWidget):
         self.listview.addItem(message)
         return 
 
-class ThreadCl(QThread):
-    def __init__(self):
-        return
-
-
 class ThreadTrainingData(QThread):
     update = pyqtSignal(str)
     finish = pyqtSignal()
@@ -112,5 +110,9 @@ class ThreadTrainingData(QThread):
         self.wait()
 
     def run(self):
-        self.trainingdata.run()
+
+        if os.path.exists(self.filename) and os.path.exists(self.stopword) :
+            self.trainingdata.run()
+        else :
+            self.update.emit("File training dan stopword tidak dapat ditemukan")
         #return super().run()

@@ -60,7 +60,6 @@ class Particle(object):
             #Update the velocity
             self.velocity[i] = (self.weight[i] * self.velocity[i]) + localVal + globalVal
             
-
     def updatefitnessfunction(self):
         fitness = self.svm.decision_function(self.position)[0][self.label]
 

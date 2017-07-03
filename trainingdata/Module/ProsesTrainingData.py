@@ -110,17 +110,18 @@ class TrainingData:
         # menganti kata kapital menjadi kecil
         tweet = tweet.lower()
     
-        # menganti kata https://* dan www.* menjadi url
-        tweet = re.sub('((www\.[^\s]+)|(https?://[^\s]+))','URL',tweet)
+        # menhapus kata https://* dan www.*
+        tweet = re.sub('((www\.[^\s]+)|(https?://[^\s]+))','',tweet)
 
-        # menganti @usename ke AT_USER
-        # tweet = re.sub('@[^\s]+','AT_USER',tweet)
+        # meghapus @usename
+        tweet = re.sub('@[^\s]+','',tweet)
 
         # menghilangkan spasi
         tweet = re.sub('[\s]+', ' ', tweet)
 
         # menghilangkan hastag
-        tweet = re.sub(r'#([^\s]+)', r'\1', tweet)
+        #tweet = re.sub(r'#([^\s]+)', r'\1', tweet)
+        tweet = re.sub(r'#([^\s]+)', '', tweet)
 
         # potong
         tweet = tweet.strip('\'"')
@@ -141,13 +142,15 @@ class TrainingData:
         tweet = myre.sub('', tweet)
 
         # menghilangkan username
-        tweet = ' '.join(re.sub("(@[A-Za-z0-9]+)|([^0-9A-Za-z \t])|(\w+:\/\/\S+)"," ",tweet).split())
+        #tweet = ' '.join(re.sub("(@[A-Za-z0-9]+)|([^0-9A-Za-z \t])|(\w+:\/\/\S+)"," ",tweet).split())
     
         return tweet
     #akhir
 
     #emlalkukan preprocessing t4erhadap data yang digunakan
     def preprocessingData(self,tweet, stopwords):
+        self.cetak("Tweet bersih : " + tweet)
+
         # mempersiapkan varible pembantu
         featureList = []
         tmpFeature = []
@@ -158,22 +161,30 @@ class TrainingData:
         stemmer = factorysteammer.create_stemmer()
 
         #proses tokenizer
+        self.cetak("Hasil Tokenization :")
         featureList = nltktokenizer.tokenize(tweet)
+        self.cetak(''.join(str(item) + " " for item in featureList))
 
         # menghilangkan kata stopwords
+        self.cetak("Hasil filter Stopwords :")
         for w in featureList:
             if w not in stopwords:
                 tmpFeature.append(w)
     
         featureList = tmpFeature
+        self.cetak(''.join(str(item) + " " for item in featureList))
         tmpFeature = []
 
         # proses steamming perkata agar mendapatkan kata baku
+        self.cetak("Hasil Stemming perkata:")
         for w in featureList:
             tmpFeature.append(stemmer.stem(w))
 
         featureList = tmpFeature
+        self.cetak(''.join(str(item) + " " for item in featureList))
         tmpFeature = []
+
+        self.cetak("")
 
         return featureList
 
@@ -187,20 +198,30 @@ class TrainingData:
 
     #persamaan svm untuk melakukan predik
     def persamaanSVM(self, X):
-        return self.clf.predict_log_proba(X)
+        return self.svmsebelumpso.predict_log_proba(X)
 
     #menyimpan mode4l presintence dari svm untuk dilakukan testing di website
     def exportModel(self,filename, featurelist):
         with open('featurelist.txt', 'a') as f:
+
             
+            self.cetak("Mengeluarkan perhitungan dalam bentuk PKL :")
+            pickle.dump(self.svm, open(filename, 'wb'))
+            self.cetak(''.join(['Selesai training model disimpan dalam ', os.path.dirname(__file__) , 'modelterbaru.pkl']))
+            
+            self.cetak("Mengeluarkan Feature List dalam bentuk TXT :")
+
             for i, feature in enumerate(featurelist):
-                self.cetak(feature)
+                self.cetak(feature.join(" :"))
                 for a in featurelist[feature]:
                     self.cetak(a)
                     f.write(''.join([a,",", feature]))
                     f.write("\n")
-                
-        pickle.dump(self.clf, open(filename, 'wb'))
+                self.cetak("")
+                self.cetak("")
+
+            self.cetak(''.join(['Selesai Feature List disimpan dalam ', os.path.dirname(__file__) , 'featurelist.txt']))                
+
 
     #function untuk menjalankan pso
     def runpso(self, particles,label):
@@ -214,12 +235,23 @@ class TrainingData:
 
         #preparing data for pso particle, append in one variable particle pso
         for index, value in enumerate(particles):
-            partic = Particle.Particle(particles[index], index, self.clf, [i for i, no in enumerate(self.clf.classes_) if no == label[index]], self.clf.class_weight_)
+            indexClass = [i for i, no in enumerate(self.svmsebelumpso.classes_) if no == label[index]]
+
+            print(self.svmsebelumpso.coef_[indexClass])
+
+            partic = Particle.Particle(
+                particles[index], 
+                index, 
+                self.svmsebelumpso, 
+                [i for i, no in enumerate(self.svmsebelumpso.classes_) if no == label[index]],
+                self.svmsebelumpso.coef_[indexClass][0]
+            )
+
             swarm[label[index]].append(partic)
             temp.append(partic)
 
-        for step in range(20):
-            print("---Itteration " + str(step) + "---")
+        for step in range(10):
+            self.cetak("---Itteration " + str(step) + "---")
 
             hasilkedua = self.pso(swarm)
 
@@ -229,8 +261,11 @@ class TrainingData:
             svmKedua = copy.deepcopy(self.svmStandard)
             svmKedua.fit(hasilkedua, self.y)
 
+            self.cetak(str(svmKedua.score(self.x1, self.y)) + ' > ' + str(svmPertama.score(self.x1,self.y)))
+
             #perbandingan akurasi pada kedua svm memiliki akurasi dibandingkan sebelumnya atau tidak
             if svmKedua.score(self.x1, self.y) > svmPertama.score(self.x1,self.y):
+                self.cetak("Hasil Perbaikan Parameter diterima")
                 self.X = copy.deepcopy( hasilkedua)        
 
     def pso(self, swarm):
@@ -241,14 +276,16 @@ class TrainingData:
         for indexswarm, valueswarm in enumerate(swarm):
             #persiapan variable yang digunakan untuk keperluan pso
             swarm[valueswarm] = sorted(swarm[valueswarm])
-            indexvalue = [i for i, no in enumerate(self.clf.classes_) if no == valueswarm]
-            weight = self.clf.class_weight_[indexvalue][0]
+            indexvalue = [i for i, no in enumerate(self.svmsebelumpso.classes_) if no == valueswarm]
+            weight = self.svmsebelumpso.class_weight_[indexvalue][0]
 
             gbest = 0
 
+            globalBest = []
+
             #penentuan gbest bedasarkan hasil dari akumulasi persamaan svm
-            for indexpbest, particlepbest in enumerate( swarm[valueswarm]):
-                pbest = self.clf.decision_function(particlepbest.position)[0][indexvalue]
+            for indexpbest, particlepbest in enumerate(swarm[valueswarm]):
+                pbest = self.svmsebelumpso.decision_function(particlepbest.position)[0][indexvalue]
                 if pbest >= gbest :
                     gbest = pbest
                     globalBest = swarm[valueswarm][indexpbest]  
@@ -287,7 +324,7 @@ class TrainingData:
             sentiment = row[0].replace('|','')
             tweet = row[1].replace('|', '')
 
-            self.cetak(''.join(["preprocessing data ke ", str(i)," tweet : ", tweet]))
+            self.cetak(''.join(["Preprocessing data ke ", str(i)," tweet : ", tweet]))
 
             #tahap preprocessing
             processedTweet = self.processTweet(tweet)
@@ -335,89 +372,62 @@ class TrainingData:
             for x in tfidfresult[feature]:
                 tfidfweight[feature].append(x[1])
 
-            print(tfidfresult[feature])
-            print(tfidfweight[feature])
+        self.cetak("")
+        self.cetak("Perhitungan TF-IDF :")
      
         # merubah ke variable yang bisa diterima oleh svm
         for i, row in enumerate(tfidfweight[positive]):
             a = [tfidfresult[positive][i][1],tfidfresult[negative][i][1], tfidfresult[neutral][i][1]]
             self.x1.append(a)
-            print(a)
+            self.cetak("Hasil TF-IDF Tweet Ke - " + str(i))
+            self.cetak("Hasil TF-IDF : " + str(a[0]) +", " + str(a[1]) + ", " + str(a[2]))
 
         #print(self.x1)
-        self.cetak('perhitungan svm dilanjutkan dengan perhitungan pso')
+        self.cetak(" ")
+        self.cetak('Perhitungan SVM :')
 
         self.X = copy.deepcopy(self.x1)
         self.y = label
         
-        self.clf =  svm.SVC(C=1.0, cache_size=200, class_weight=None, coef0=0.0,
+        self.svmsebelumpso =  svm.SVC(C=1.0, cache_size=200, class_weight=None, coef0=0.0,
             decision_function_shape="ovr", degree=3, gamma='auto', kernel='linear',
             max_iter=-1, probability=True, random_state=None, shrinking=True,
             tol=0.001, verbose=True)
-        #self.clf = copy.deepcopy(self.svmStandard)
-        self.clf.fit(self.X,self.y)
 
+        #self.svmsebelumpso = copy.deepcopy(self.svmStandard)
+        self.svmsebelumpso.fit(self.X,self.y)
+        asss = self.svmsebelumpso.decision_function(self.x1)
+        print(asss.shape)
+        print(self.svmsebelumpso.class_weight_)
+        print(self.svmsebelumpso.predict(self.x1))
+        print(self.svmsebelumpso.support_ )
+        print(self.svmsebelumpso.score(self.x1, self.y))
+        print(self.svmsebelumpso.classes_)
+        print(self.svmsebelumpso.support_vectors_)
+        print("cofisien for svm :")
+        print(self.svmsebelumpso.coef_)
+        print("dual cofisien for svm :")
+        print(self.svmsebelumpso.dual_coef_)
+
+        self.cetak(''.join(str(e) + " " for e in self.svmsebelumpso.predict(self.x1)))
+        self.cetak(str(self.svmsebelumpso.score(self.x1, self.y)))
+        
+        self.cetak("")
+        self.cetak("Pehitungan PSO terhadap Paramter SVM :")
         #run pso
         self.runpso(self.x1, self.y)
 
         self.svm = copy.deepcopy(self.svmStandard)
         self.svm.fit(self.X, self.y)
-        asss = self.clf.decision_function(self.x1)
 
-        print(asss.shape)
-        print(self.clf.class_weight_)
-        print(self.clf.predict(self.x1))
-        print(self.clf.support_ )
-        print(self.clf.score(self.x1, self.y))
-        print(self.clf.classes_)
-        print(self.clf.support_vectors_)
-        print("cofisien for svm :")
-        print(self.clf.coef_)
-        print("dual cofisien for svm :")
-        print(self.clf.dual_coef_)
-        
         
         print(self.svm.decision_function(self.x1))
         print(self.svm.predict(self.x1))
         print(self.svm.support_vectors_ )
         print(self.svm.score(self.x1, self.y))
-
+        
         self.exportModel('modelterbaru.pkl', featurelist)
-
-        self.cetak(''.join(['Selesai training model disimpan dalam ', os.path.dirname(__file__) , 'modelterbaru.pkl']))
-
-        '''
-        a = x1
-        print(clf.classes_)
-
-        dicision = self.persamaanSVM(a)
-        #dicision = clf.predict_proba(a)
-        print(dicision)
-        print(clf.predict(a))
-
-        #print(clf.predict([10.58,10.76,0.04013377926421405]))
-        #print(clf.predict([0, 0.09126984126984126,  1.3140096618357489]))
-        #print(clf.get_params())
-        w = clf.coef_[0]
-        #print(w)
-
-        a = -w[0] / w[1]
-
-        xx = np.linspace(0,12)
-        yy = a * xx - clf.intercept_[0] / w[1]
-
-        h0 = plt.plot(xx, yy, 'k-', label="non weighted div")
-
-        #'''
 
     def cetak(self, pesan):
         print(pesan)
         self.update.emit(pesan)
-'''
-        plt.scatter(X[:, 0], X[:, 1], c = y)
-        plt.legend()
-        plt.show()
-
-
-
-'''
