@@ -207,7 +207,7 @@ class TrainingData:
             
             self.cetak("Mengeluarkan perhitungan dalam bentuk PKL :")
             pickle.dump(self.svm, open(filename, 'wb'))
-            self.cetak(''.join(['Selesai training model disimpan dalam ', os.path.dirname(__file__) , 'modelterbaru.pkl']))
+            self.cetak(''.join(['Selesai training model disimpan dalam ', os.path.dirname(__file__) ,'\\', filename]))
             
             self.cetak("Mengeluarkan Feature List dalam bentuk TXT :")
 
@@ -220,7 +220,7 @@ class TrainingData:
                 self.cetak("")
                 self.cetak("")
 
-            self.cetak(''.join(['Selesai Feature List disimpan dalam ', os.path.dirname(__file__) , 'featurelist.txt']))                
+            self.cetak(''.join(['Selesai Feature List disimpan dalam ', os.path.dirname(__file__) , '\\','featurelist.txt']))                
 
 
     #function untuk menjalankan pso
@@ -250,7 +250,7 @@ class TrainingData:
             swarm[label[index]].append(partic)
             temp.append(partic)
 
-        for step in range(10):
+        for step in range(3):
             self.cetak("---Itteration " + str(step) + "---")
 
             hasilkedua = self.pso(swarm)

@@ -93,6 +93,7 @@ class App(QWidget):
 
     def insertStrListView(self, message):
         self.listview.addItem(message)
+        self.listview.scrollToBottom()
         return 
 
 class ThreadTrainingData(QThread):
