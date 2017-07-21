@@ -60,17 +60,24 @@ class App(QWidget):
     @pyqtSlot()
     def on_click(self):
         filename = self.openFileNameDialog()
-        QMessageBox.question(self, "Pesan", "Anda telah memilih file Training, sekarang anda memilih file stopword", QMessageBox.Yes)
-        self.insertStrListView("".join(["Data training yang digunakan : ", filename]))
+        if filename:
+            QMessageBox.question(self, "Pesan", "Anda telah memilih file Training, sekarang anda memilih file stopword", QMessageBox.Yes)
+            self.insertStrListView("".join(["Data training yang digunakan : ", filename]))
+        else:
+            QMessageBox.question(self, "Pesan", "Anda masih belum memmilih file Training", QMessageBox.Yes)
 
         stopword = self.openFileStopword()
-        QMessageBox.question(self, "Pesan", "Anda telah memilih file Stopwords, sekarang data telah siap untuk ditraining", QMessageBox.Yes)
-        self.insertStrListView("".join(["File stopword yang digunakan : ", stopword]))
+        if stopword:
+            QMessageBox.question(self, "Pesan", "Anda telah memilih file Stopwords, sekarang data telah siap untuk ditraining", QMessageBox.Yes)
+            self.insertStrListView("".join(["File stopword yang digunakan : ", stopword]))
+        else:
+            QMessageBox.question(self, "Pesan", "Anda masih belum memmilih file Stopword", QMessageBox.Yes)
 
         if filename: 
-            self.threadTrainingData = ThreadTrainingData(filename, stopword)
-            self.threadTrainingData.update.connect(self.insertStrListView)
-            self.listview.addItem("Data training telah dimaukan, training data telah siap")
+            if stopword:
+                self.threadTrainingData = ThreadTrainingData(filename, stopword)
+                self.threadTrainingData.update.connect(self.insertStrListView)
+                self.listview.addItem("Data training telah dimaukan, training data telah siap")
 
     @pyqtSlot()
     def on_click_run(self):
@@ -80,14 +87,14 @@ class App(QWidget):
     def openFileNameDialog(self):    
         options = QFileDialog.Options()
         options |= QFileDialog.DontUseNativeDialog
-        fileName, _ = QFileDialog.getOpenFileName(self,"Import File Dataset", "","All Files (*);;Python Files (*.sav)", options=options)
+        fileName, _ = QFileDialog.getOpenFileName(self,"Import File Dataset", "","CSV Files (*.csv)", options=options)
         if fileName:
             return fileName
 
     def openFileStopword(self):    
         options = QFileDialog.Options()
         options |= QFileDialog.DontUseNativeDialog
-        fileName, _ = QFileDialog.getOpenFileName(self,"Import File Stopwords", "","All Files (*);;Python Files (*.txt)", options=options)
+        fileName, _ = QFileDialog.getOpenFileName(self,"Import File Stopwords", "","Python Files (*.txt)", options=options)
         if fileName:
             return fileName
 

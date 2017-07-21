@@ -37,10 +37,7 @@ class TfIdf:
         self.documents.append([doc_name, doc_dict])
 
     def similarities(self, list_of_words):
-        """Returns a list of all the [docname, similarity_score] pairs relative to a
-list of words.
-
-        """
+        """Returns a list of all the [docname, similarity_score] pairs relative to a list of words."""
 
         # building the query dictionary
         query_dict = {}
