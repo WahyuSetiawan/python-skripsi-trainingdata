@@ -1,10 +1,4 @@
-import re
-import sys
-import csv
-import math
-import os
-import pickle
-import copy
+import re, time , sys, math, csv, os, pickle, copy
 import multiprocessing as Pool
 import warnings
 
@@ -203,8 +197,6 @@ class TrainingData:
     #menyimpan mode4l presintence dari svm untuk dilakukan testing di website
     def exportModel(self,filename, featurelist):
         with open('featurelist.txt', 'a') as f:
-
-            
             self.cetak("Mengeluarkan perhitungan dalam bentuk PKL :")
             pickle.dump(self.svm, open(filename, 'wb'))
             self.cetak(''.join(['Selesai training model disimpan dalam ', os.path.dirname(__file__) ,'\\', filename]))
@@ -212,19 +204,17 @@ class TrainingData:
             self.cetak("Mengeluarkan Feature List dalam bentuk TXT :")
 
             for i, feature in enumerate(featurelist):
-                self.cetak(feature.join(" :"))
                 for a in featurelist[feature]:
-                    self.cetak(a)
+                    print(a)
                     f.write(''.join([a,",", feature]))
                     f.write("\n")
-                self.cetak("")
-                self.cetak("")
 
             self.cetak(''.join(['Selesai Feature List disimpan dalam ', os.path.dirname(__file__) , '\\','featurelist.txt']))                
 
 
     #function untuk menjalankan pso
     def runpso(self, particles,label):
+
         swarm = {
             positive : [], 
             negative : [],
@@ -248,29 +238,35 @@ class TrainingData:
             )
 
             swarm[label[index]].append(partic)
+
+            print(label[index])
+            print(partic)
+
             temp.append(partic)
 
         for step in range(3):
-            self.cetak("---Itteration " + str(step) + "---")
+            self.cetak("--- Iterasi PSO : " + str(step + 1) + "---")
 
             hasilkedua = self.pso(swarm)
 
             svmPertama = copy.deepcopy(self.svmStandard)
-            svmPertama.fit(self.X, self.y)
+            svmPertama.fit(self.xsplit, self.y)
 
             svmKedua = copy.deepcopy(self.svmStandard)
             svmKedua.fit(hasilkedua, self.y)
 
-            self.cetak(str(svmKedua.score(self.x1, self.y)) + ' > ' + str(svmPertama.score(self.x1,self.y)))
+            self.cetak(str(svmKedua.score(self.x1, self.label)) + ' > ' + str(svmPertama.score(self.x1, self.label)))
 
             #perbandingan akurasi pada kedua svm memiliki akurasi dibandingkan sebelumnya atau tidak
-            if svmKedua.score(self.x1, self.y) > svmPertama.score(self.x1,self.y):
+            if svmKedua.score(self.x1, self.label) > svmPertama.score(self.x1,self.label):
                 self.cetak("Hasil Perbaikan Parameter diterima")
-                self.X = copy.deepcopy( hasilkedua)        
+                self.X = copy.deepcopy(hasilkedua)    
+            else:
+                self.cetak("Hasil yang terdapat pada PSO tidak dapat digunakan")
 
     def pso(self, swarm):
         #do pso litetation 
-        temp = copy.deepcopy(self.X)
+        temp = copy.deepcopy(self.xsplit)
 
         # perubahan particle berdasarkan feature mereka
         for indexswarm, valueswarm in enumerate(swarm):
@@ -279,14 +275,19 @@ class TrainingData:
             indexvalue = [i for i, no in enumerate(self.svmsebelumpso.classes_) if no == valueswarm]
             weight = self.svmsebelumpso.class_weight_[indexvalue][0]
 
-            gbest = 0
+            gbest = None
 
             globalBest = []
 
             #penentuan gbest bedasarkan hasil dari akumulasi persamaan svm
             for indexpbest, particlepbest in enumerate(swarm[valueswarm]):
                 pbest = self.svmsebelumpso.decision_function(particlepbest.position)[0][indexvalue]
-                if pbest >= gbest :
+                print(pbest)
+                if (gbest == None) :
+                    gbest = pbest
+                    globalBest = swarm[valueswarm][indexpbest]  
+                    self.solution = globalBest
+                elif (pbest >= gbest):
                     gbest = pbest
                     globalBest = swarm[valueswarm][indexpbest]  
                     self.solution = globalBest
@@ -305,6 +306,11 @@ class TrainingData:
 
     # run program pemanggilan data
     def run(self):
+
+        self.cetak("")
+        self.cetak("-------------- mempersiapkan variable ------------------")
+        self.cetak("")
+
         global positive
         global negative
         global neutral
@@ -319,12 +325,17 @@ class TrainingData:
 
         self.tfidfDocument = tfidf.TfIdf()
 
+        self.cetak("-------------- Persiapan Telah Selesai ------------------")
+        self.cetak("")
+        self.cetak("-------------- preprocessing ------------------")
+        self.cetak("")
+
         # start loop
         for i, row in enumerate(self.inpTweets):
             sentiment = row[0].replace('|','')
             tweet = row[1].replace('|', '')
 
-            self.cetak(''.join(["Preprocessing data ke ", str(i)," tweet : ", tweet]))
+            self.cetak(''.join(["Preprocessing data ke ", str(i + 1)," tweet : ", tweet]))
 
             #tahap preprocessing
             processedTweet = self.processTweet(tweet)
@@ -372,8 +383,10 @@ class TrainingData:
             for x in tfidfresult[feature]:
                 tfidfweight[feature].append(x[1])
 
+        
         self.cetak("")
-        self.cetak("Perhitungan TF-IDF :")
+        self.cetak("-------------- perhitungan TF IDF ------------------")
+        self.cetak("")
      
         # merubah ke variable yang bisa diterima oleh svm
         for i, row in enumerate(tfidfweight[positive]):
@@ -383,11 +396,29 @@ class TrainingData:
             self.cetak("Hasil TF-IDF : " + str(a[0]) +", " + str(a[1]) + ", " + str(a[2]))
 
         #print(self.x1)
-        self.cetak(" ")
-        self.cetak('Perhitungan SVM :')
 
-        self.X = copy.deepcopy(self.x1)
-        self.y = label
+        self.cetak("")
+        self.cetak("-------------- perhitungan SVM ------------------")
+        self.cetak("")
+
+        lentfidf = int(round(len(self.x1) / 10,0))
+
+        self.xsplit = []
+        self.y = []
+        self.label = label
+
+        self.parametersplit = self.split(self.x1, 10)
+        self.labelsplit = self.split(label, 10)
+        
+        for i in range(9):
+        #for i in range(round(lentfidf * 9 / 10)):
+            self.xsplit.append(self.x1[i])
+            self.y.append(label[i])
+
+        self.X = copy.deepcopy(self.xsplit)
+        #self.y = label
+
+        print(self.xsplit)
         
         self.svmsebelumpso =  svm.SVC(C=1.0, cache_size=200, class_weight=None, coef0=0.0,
             decision_function_shape="ovr", degree=3, gamma='auto', kernel='linear',
@@ -395,13 +426,15 @@ class TrainingData:
             tol=0.001, verbose=True)
 
         #self.svmsebelumpso = copy.deepcopy(self.svmStandard)
-        self.svmsebelumpso.fit(self.X,self.y)
+        self.svmsebelumpso.fit(self.xsplit, self.y)
+
         asss = self.svmsebelumpso.decision_function(self.x1)
+
         print(asss.shape)
         print(self.svmsebelumpso.class_weight_)
         print(self.svmsebelumpso.predict(self.x1))
         print(self.svmsebelumpso.support_ )
-        print(self.svmsebelumpso.score(self.x1, self.y))
+        print(self.svmsebelumpso.score(self.x1, label))
         print(self.svmsebelumpso.classes_)
         print(self.svmsebelumpso.support_vectors_)
         print("cofisien for svm :")
@@ -410,24 +443,53 @@ class TrainingData:
         print(self.svmsebelumpso.dual_coef_)
 
         self.cetak(''.join(str(e) + " " for e in self.svmsebelumpso.predict(self.x1)))
-        self.cetak(str(self.svmsebelumpso.score(self.x1, self.y)))
+
+        self.cetak("perhitungan akurasi terhadap keseluruhan data : ")
+        self.cetak(str(self.svmsebelumpso.score(self.x1, label)))
+
+        for i in range(10):
+            self.cetak("".join(["perhitungan akurasi terhadap potongan ",str(i + 1), " data uji"]))
+            self.cetak(str(self.svmsebelumpso.score(self.parametersplit[i], self.labelsplit[i])))
         
+
         self.cetak("")
-        self.cetak("Pehitungan PSO terhadap Paramter SVM :")
+        self.cetak("-------------- perhitungan optimasi dengan Particle Swarm Optimization ------------------")
+        self.cetak("")
+
         #run pso
-        self.runpso(self.x1, self.y)
+        self.runpso(self.xsplit, self.y)
 
         self.svm = copy.deepcopy(self.svmStandard)
         self.svm.fit(self.X, self.y)
-
         
-        print(self.svm.decision_function(self.x1))
+        #print(self.svm.decision_function(self.x1))
         print(self.svm.predict(self.x1))
         print(self.svm.support_vectors_ )
-        print(self.svm.score(self.x1, self.y))
         
+        self.cetak("perhitungan akurasi terhadap keseluruhan data : ")
+        self.cetak(str(self.svm.score(self.x1, label)))
+
+        for i in range(10):
+            self.cetak("perhitungan akurasi terhadap potongan ".join([str(i), " data uji"]))
+            self.cetak(str(self.svm.score(self.parametersplit[i], self.labelsplit[i])))
+        
+        self.cetak("")
+        self.cetak("-------------- selesai training data ------------------")
+        self.cetak("")
+        self.cetak("-------------- langkah export data ------------------")
+        self.cetak("")
+
         self.exportModel('modelterbaru.pkl', featurelist)
 
     def cetak(self, pesan):
         print(pesan)
         self.update.emit(pesan)
+
+    def split(self, arr, size):
+        arrs = []
+        while len(arr) > size:
+            pice = arr[:size]
+            arrs.append(pice)
+            arr   = arr[size:]
+        arrs.append(arr)
+        return arrs
