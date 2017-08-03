@@ -92,13 +92,11 @@ class TrainingData:
         #tweet = re.sub(r'#([^\s]+)', r'\1', tweet)
         tweet = re.sub(r'#([^\s]+)', '', tweet)
 
-        tweet = re.sub(r'\\u[^\s]+', '',tweet)
-
         # potong
         tweet = tweet.strip('\'"')
 
         # menghilangkan kata kata unicode untuk emoticon
-        #tweet = tweet.encode('ascii', 'ignore').decode('unicode_escape')
+        tweet = tweet.encode('ascii', 'ignore').decode('unicode_escape')
 
         tweet =  re.sub(r'\w+:\/{2}[\d\w-]+(\.[\d\w-]+)*(?:(?:\/[^\s/]*))*', '', tweet)
 
@@ -201,9 +199,6 @@ class TrainingData:
 
         weighthasilpso = trainingweight
 
-        pso_tertinggi = 0
-        pso_weight = trainingweight
-
         #preparing data for pso particle, append in one variable particle pso
         for index, value in enumerate(trainingweight):
             indexClass = [i for i, no in enumerate(svm.classes_) if no == traininglabel[index]]
@@ -222,7 +217,7 @@ class TrainingData:
 
             temp.append(partic)
 
-        for step in range(1):
+        for step in range(10):
             self.cetak("--- Iterasi PSO : " + str(step + 1) + "---")
 
             hasilkedua = self.pso(swarm, trainingweight, svm)
@@ -241,24 +236,17 @@ class TrainingData:
             #perbandingan akurasi pada kedua svm memiliki akurasi dibandingkan sebelumnya atau tidak
             if scorekedua > scorepertama:
                 self.cetak("Hasil Perbaikan Parameter diterima")
-
-                weighthasilpso = copy.deepcopy(hasilkedua)    
-#                trainingweight = copy.deepcopy(hasilkedua) 
+#                weighthasilpso = copy.deepcopy(hasilkedua)    
+                trainingweight = copy.deepcopy(hasilkedua) 
             else:
                 self.cetak("Hasil yang terdapat pada PSO tidak dapat digunakan")
 
-            if pso_tertinggi < scorekedua:
-                pso_tertinggi = scorekedua
-                pso_weight = hasilkedua
-
-        return weighthasilpso, pso_weight
+        return trainingweight
 
     def pso(self, swarm, particles, svm):
         #do pso literasi 
         temp = copy.deepcopy(particles)
         svm_decision_matrix = svm.decision_function(particles)
-
-        print(svm_decision_matrix)
 
         # perubahan particle berdasarkan feature mereka
         for indexswarm, valueswarm in enumerate(swarm):
@@ -332,142 +320,49 @@ class TrainingData:
                     negative : [],
                     neutral : []
                     }
+        tfidf_result = {
+                    positive : [], 
+                    negative : [],
+                    neutral : []
+                    }
+
+        tfidf_weight = {
+                    positive : [], 
+                    negative : [],
+                    neutral : []
+                    }
 
         pso_particle = {
                     positive : [], 
                     negative : [],
                     neutral : []
                     }
+
+        svm_bobot = []
         x2 = []
 
         tweet_labels = []
+
+        tweets = []
+
+        tfidf_perhitungan = tfidf.TfIdf()
 
         self.cetak("-------------- Persiapan Telah Selesai ------------------")
         self.cetak("")
         self.cetak("-------------- preprocessing ------------------")
         self.cetak("")
 
-        tweet_data_training, tweet_data_test, tweet_label_training, tweet_label_test = train_test_split(daftar_tweet, daftar_label, test_size = 0.05, random_state = 0)
+        tweet_data_training , tweet_label_training, tweet_data_test, tweet_label_test = train_test_split(daftar_tweet, daftar_label, test_size = 0.25, random_state = 0)
 
-        tfidf_perhitungan, featurelist = self.preprocessing(tweet_data_training, tweet_label_training)
-        tfidf_perhitungan_test, featurelist_test = self.preprocessing(tweet_data_test, tweet_data_test)
-
-        '''
-
-        perhitungan tf idf untuk training
-
-        '''
-
-        svm_bobot = self.perhitungantfidf(tfidf_perhitungan, featurelist)
-        svm_bobot_test = self.perhitungantfidf(tfidf_perhitungan_test, featurelist)
+        print(tweet_data_training)
+        print(tweet_label_training)
+        print(tweet_data_test)
+        print(tweet_label_test)
         
-
-        self.cetak("")
-        self.cetak("-------------- perhitungan SVM ------------------")
-        self.cetak("")
-
-        tfidf_len = len(svm_bobot)
-
-        svm_bobot_split = []
-        tweet_labels_split = []
-
-        svm_bobot_fold = self.split(svm_bobot, round(len(svm_bobot) / 10))
-        svm_label_fold = self.split(tweet_label_training, round(len(tweet_label_training) / 10))
-        
-        #for i in range(len(svm_bobot_fold)):
-        for i in range(len(svm_bobot_fold)):
-            svm_bobot_split.extend(svm_bobot_fold[i])
-            tweet_labels_split.extend(svm_label_fold[i])
-
-        svm_sebelumpso = copy.deepcopy(self.svm_standard)
-        svm_sebelumpso.fit(svm_bobot_split, tweet_labels_split)
-
-        self.cetak("Hasil score testing terhadap data testing sebelum PSO: ")
-        self.cetak(svm_sebelumpso.score(svm_bobot_test, tweet_label_test))
-
-        '''
-
-        print hasil parameter
-
-        '''
-        
-        self.printEvaluasi(svm_sebelumpso, svm_bobot_fold, svm_label_fold)
-
-        self.cetak("")
-        self.cetak("-------------- Perhitungan optimasi dengan Particle Swarm Optimization ------------------")
-        self.cetak("")
-
-        #pso_bobot = self.runpso(svm_bobot_split, tweet_labels_split, svm_sebelumpso, svm_bobot_test, tweet_label_test)
-        while True:
-            pso_bobot, pso_tertinggi = self.runpso(svm_bobot_split, tweet_labels_split, svm_sebelumpso, svm_bobot_split, tweet_labels_split)
-
-            svm_pso_tertinggi = copy.deepcopy(self.svm_standard)
-            svm_pso_tertinggi.fit(pso_tertinggi, tweet_labels_split)
-
-            if accuracy_score(svm_pso_tertinggi.predict(pso_tertinggi), tweet_labels_split) > svm_sebelumpso.score(svm_bobot_split, tweet_labels_split):
-                break
-
-        '''
-        svm_setelahpso = copy.deepcopy(self.svm_standard)
-        svm_setelahpso.fit(pso_bobot, tweet_labels_split)
-        '''
-
-        svm_pso_tertinggi = copy.deepcopy(self.svm_standard)
-        svm_pso_tertinggi.fit(pso_tertinggi, tweet_labels_split)
-
-        self.cetak("Hasil score testing terhadap data testing setelah PSO : ")
-        self.cetak(svm_pso_tertinggi.score(svm_bobot_test, tweet_label_test))
-        
-        '''
-
-        print hasil parameter
-
-        '''
-        '''
-        self.printEvaluasi(svm_setelahpso, svm_bobot_fold, svm_label_fold)
-        self.cetak("")
-        self.cetak("")
-        self.cetak("")
-        self.cetak("Evaluasi data training setelah PSO")
-        self.cetak("")
-
-        print(len(svm_bobot_split))
-        print(len(pso_tertinggi))
-        '''
-
-        self.printEvaluasi1(svm_pso_tertinggi, pso_tertinggi, tweet_labels_split)
-        
-        self.cetak("")
-        self.cetak("-------------- selesai training data ------------------")
-        self.cetak("")
-        self.cetak("-------------- langkah export data ------------------")
-        self.cetak("")
-
-        self.exportModel(svm_setelahpso, 'modelterbaru.pkl', featurelist)
-
-    def preprocessing(self, tweet, label):
-        tweets = []
-
-        tfidf_perhitungan = tfidf.TfIdf()
-
-        document = {
-                    positive : [], 
-                    negative : [],
-                    neutral : []
-                    }
-        
-        featurelist = {
-                    positive : [], 
-                    negative : [],
-                    neutral : []
-                    }
-
-        tweet_labels = []
-
         # start loop
-        for i, row in enumerate(tweet):
-            preprocessing_sentiment = label[i].replace('|', '')
-            preprocessing_tweet = tweet[i].replace('|', '')
+        for i, row in enumerate(self.daftarTweet):
+            preprocessing_sentiment = row[0].replace('|','')
+            preprocessing_tweet = row[1].replace('|', '')
 
             self.cetak(''.join(["Preprocessing data ke ", str(i + 1)," tweet : ", preprocessing_tweet]))
 
@@ -511,24 +406,7 @@ class TrainingData:
 
         for i, data in enumerate(featurelist):
             featurelist[data] = list(set(featurelist[data]))
-
-        return tfidf_perhitungan, featurelist
-
-    def perhitungantfidf(self, tfidf_perhitungan, featurelist):    
-        tfidf_result = {
-                    positive : [], 
-                    negative : [],
-                    neutral : []
-                    }
-
-        tfidf_weight = {
-                    positive : [], 
-                    negative : [],
-                    neutral : []
-                    }
-
-        svm_bobot = []
-
+        
         # mendapatkan pembobotan menggunakan tf idf
         for i, feature in enumerate(featurelist):
             #self.cetak("generating tf idf per feature : ".join(feature))
@@ -549,9 +427,66 @@ class TrainingData:
             self.cetak("Hasil TF-IDF Tweet Ke - " + str(i + 1))
             self.cetak("Hasil TF-IDF : " + str(a))
 
-        return svm_bobot
-
         #print(self.svm_bobot)
+
+        self.cetak("")
+        self.cetak("-------------- perhitungan SVM ------------------")
+        self.cetak("")
+
+        tfidf_len = len(svm_bobot)
+
+        svm_bobot_split = []
+        tweet_labels_split = []
+
+        svm_bobot_fold = self.split(svm_bobot, round(len(svm_bobot) / 10))
+        svm_label_fold = self.split(tweet_labels, round(len(tweet_labels) / 10))
+        
+        #for i in range(len(svm_bobot_fold)):
+        for i in range(len(svm_bobot_fold)):
+            svm_bobot_split.extend(svm_bobot_fold[i])
+            tweet_labels_split.extend(svm_label_fold[i])
+
+        X = copy.deepcopy(svm_bobot_split)
+        
+        svm_sebelumpso = copy.deepcopy(self.svm_standard)
+        svm_sebelumpso.fit(svm_bobot_split, tweet_labels_split)
+
+        print(svm_sebelumpso.score(svm_bobot, tweet_labels))
+
+        '''
+
+        print hasil parameter
+
+        '''
+        
+        self.printEvaluasi(svm_sebelumpso, svm_bobot_fold, svm_label_fold)
+
+        self.cetak("")
+        self.cetak("-------------- Perhitungan optimasi dengan Particle Swarm Optimization ------------------")
+        self.cetak("")
+
+        pso_bobot = self.runpso(svm_bobot_split, tweet_labels_split, svm_sebelumpso, svm_bobot, tweet_labels)
+
+        svm_setelahpso = copy.deepcopy(self.svm_standard)
+        svm_setelahpso.fit(pso_bobot, tweet_labels_split)
+        
+        '''
+
+        print hasil parameter
+
+        '''
+        
+        self.printEvaluasi(svm_setelahpso, svm_bobot_fold, svm_label_fold)
+        
+        self.cetak("")
+        self.cetak("-------------- selesai training data ------------------")
+        self.cetak("")
+        self.cetak("-------------- langkah export data ------------------")
+        self.cetak("")
+
+        self.exportModel(svm_setelahpso, 'modelterbaru.pkl', featurelist)
+
+
     def cetak(self, pesan):
         print(pesan)
         self.update.emit(str(pesan))
@@ -572,11 +507,7 @@ class TrainingData:
         for fold in range(len(weight_fold)):
           weight.extend(weight_fold[fold])
           label.extend(label_fold[fold])
-        
-        self.printEvaluasi1(svm, weight, label)
 
-
-    def printEvaluasi1(self, svm, weight, label):
         svm_decision_function = svm.decision_function(weight)
         svm_hasil_prediksi = svm.predict(weight)
 
@@ -599,8 +530,6 @@ class TrainingData:
         pembuatan kurva roc
 
         '''
-
-        '''
         
         roc_fpr = dict()
         roc_tpr = dict()
@@ -612,11 +541,10 @@ class TrainingData:
             roc_fpr[i], roc_tpr[i], _ = roc_curve(label_binari[:, i], svm_decision_function [:, i])
             roc_auc[i] = auc(roc_fpr[i], roc_tpr[i])
 
-        #self.cetak(''.join(str(e) + " " for e in svm.predict(weight)))
+        self.cetak(''.join(str(e) + " " for e in svm.predict(weight)))
 
         self.cetak("perhitungan akurasi terhadap keseluruhan data : ")
         self.cetak(str(round(cm_akurasi_score * 100, 2)))
-        '''
 
         '''
 
@@ -625,32 +553,18 @@ class TrainingData:
         '''
 
         #'''
-
         if len(weight) > 10 :
-            X = np.array(weight)
-            y = np.array(label)
-            kf = KFold(n_splits=10)
-
-            for train_index, test_index in kf.split(X):
-               self.cetak("Perhitugnan perfold : ")
-               X_train, X_test = X[train_index], X[test_index]
-               y_train, y_test = y[train_index], y[test_index]
-
-               svm = copy.deepcopy(self.svm_standard)
-               svm.fit(X_train, y_train)
-               self.cetak(svm.score(X_test, y_test))
-
-               fold_predik = svm.predict(X_test)
-               self.cetak(confusion_matrix(fold_predik, y_test))
-               self.cetak(classification_report(fold_predik, y_test))
-
             cross_hasil = cross_val_score(copy.deepcopy(self.svm_standard), weight, label, cv= 10, n_jobs = -1)
             self.cetak("perhitungan akurasi terhadap keseluruhan data : ")
-            self.cetak(str(cross_hasil.mean() * 100))
+            self.cetak(str(cross_hasil))
+            self.cetak("perhitungan akurasi terhadap keseluruhan data : ")
+            self.cetak(str(cross_hasil.mean()))
+
+       
 
         #'''
 
-            '''
+        '''
         plt.figure()
         lw = 2
         plt.plot(fpr[2], tpr[2], color='darkorange',

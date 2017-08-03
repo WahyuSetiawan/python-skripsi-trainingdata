@@ -1,0 +1,90 @@
+ '''
+
+        decisionfunctionsebelumpso = svm_sebelumpso.decision_function(svm_bobot)
+
+        #print("Decision Function")
+        print(decisionfunctionsebelumpso)
+        hasilprediksebelumpso = svm_sebelumpso.predict(svm_bobot)
+
+        cm_akurasi_score_sebelum_pso = accuracy_score(tweet_labels, hasilprediksebelumpso)
+        cm_confusionmatrix_sebelum_pso = confusion_matrix(tweet_labels, hasilprediksebelumpso)
+        cm_classification_report_sebelum_pso = classification_report(tweet_labels, hasilprediksebelumpso)
+
+        print(cm_akurasi_score_sebelum_pso)
+        print(cm_confusionmatrix_sebelum_pso)
+        print(cm_classification_report_sebelum_pso)
+        
+        roc_fpr = dict()
+        roc_tpr = dict()
+        roc_auc = dict()
+
+        label_binari = label_binarize(hasilprediksebelumpso, svm_sebelumpso.classes_)
+
+        for i in range(3):
+            roc_fpr[i], roc_tpr[i], _ = roc_curve(label_binari[:, i], decisionfunctionsebelumpso [:, i])
+            roc_auc[i] = auc(roc_fpr[i], roc_tpr[i])
+
+        self.cetak(''.join(str(e) + " " for e in svm_sebelumpso.predict(svm_bobot)))
+
+        self.cetak("perhitungan akurasi terhadap keseluruhan data : ")
+        self.cetak(str(svm_sebelumpso.score(svm_bobot, tweet_labels)))
+
+        for i in range(len(svm_bobot_fold)):
+            self.cetak("".join(["perhitungan akurasi terhadap potongan ",str(i + 1), " data uji"]))
+            self.cetak(str(svm_sebelumpso.score(svm_bobot_fold[i], svm_label_fold[i])))
+        
+        #'''
+
+
+backup script :
+		
+        tfidf_len = len(svm_bobot)
+
+        svm_bobot_split = []
+        tweet_labels_split = []
+
+        svm_bobot_fold = self.split(svm_bobot, round(len(svm_bobot) / 10))
+        svm_label_fold = self.split(tweet_labels, round(len(tweet_labels) / 10))
+        
+        for i in range(9):
+        #for i in range(round(tfidf_len * 9 / 10)):
+            svm_bobot_split.extend(svm_bobot_fold[i])
+            tweet_labels_split.extend(svm_label_fold[i])
+
+        X = copy.deepcopy(svm_bobot_split)
+        
+        svm_sebelumpso = copy.deepcopy(self.svm_standard)
+        svm_sebelumpso.fit(svm_bobot_split, tweet_labels_split)
+
+        '''
+
+        print hasil parameter
+
+        '''
+        
+        self.printEvaluasi(svm_sebelumpso, svm_bobot_fold, svm_label_fold)
+
+        self.cetak("")
+        self.cetak("-------------- Perhitungan optimasi dengan Particle Swarm Optimization ------------------")
+        self.cetak("")
+
+        pso_bobot = self.runpso(svm_bobot_split, tweet_labels_split, svm_sebelumpso, svm_bobot, tweet_labels)
+
+        svm_setelahpso = copy.deepcopy(self.svm_standard)
+        svm_setelahpso.fit(pso_bobot, tweet_labels_split)
+        
+        '''
+
+        print hasil parameter
+
+        '''
+        
+        self.printEvaluasi(svm_setelahpso, svm_bobot_fold, svm_label_fold)
+        
+        self.cetak("")
+        self.cetak("-------------- selesai training data ------------------")
+        self.cetak("")
+        self.cetak("-------------- langkah export data ------------------")
+        self.cetak("")
+
+        self.exportModel(svm_setelahpso, 'modelterbaru.pkl', featurelist)

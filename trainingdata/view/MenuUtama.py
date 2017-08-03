@@ -47,6 +47,7 @@ class App(QWidget):
         self.listview = QListWidget(self)
         self.listview.move(10,10)
         self.listview.resize(self.frameGeometry().width() - 20, button.frameGeometry().y() - self.listview.frameGeometry().y() - 10)
+        self.listview.setWordWrap(True)
     
         self.show()
 

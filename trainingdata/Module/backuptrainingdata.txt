@@ -1,0 +1,575 @@
+import re, time , sys, math, csv, os, pickle, copy
+import multiprocessing as Pool
+import warnings
+
+from PyQt5.QtWidgets import QListWidget
+from PyQt5.QtCore import pyqtSignal
+
+import numpy as np
+import matplotlib.pyplot as plt
+from matplotlib import style
+style.use("ggplot")
+
+from sklearn import svm
+from sklearn.metrics import confusion_matrix, roc_curve, auc
+from sklearn.preprocessing import label_binarize
+from Utility import tfidf, Particle
+
+from nltk.tokenize import TweetTokenizer
+from nltk.corpus import stopwords
+
+from Sastrawi.Stemmer.StemmerFactory import StemmerFactory
+from sklearn.feature_extraction.text import TfidfVectorizer
+
+positive = 'positive'
+negative = 'negative'
+neutral = 'neutral'
+
+stopwords = None
+
+featurelist = {
+            positive : [], 
+            negative : [],
+            neutral : []
+            }
+document = {
+            positive : [], 
+            negative : [],
+            neutral : []
+            }
+tfidfresult = {
+            positive : [], 
+            negative : [],
+            neutral : []
+            }
+
+tfidfweight = {
+            positive : [], 
+            negative : [],
+            neutral : []
+            }
+
+particle = {
+            positive : [], 
+            negative : [],
+            neutral : []
+            }
+
+x1 = []
+x2 = []
+
+label = []
+
+clf = None
+
+class TrainingData:
+    update = pyqtSignal(str)
+
+    def __init__(self, tweet, stopword, qlistwidget = None):
+       self.st = open(stopword, 'r')
+       self.stopWords = self.getStopWordList(stopword)
+
+       #Read the tweets one by one and process it
+       ##inpTweets = csv.reader(open('data/sampleTweets.csv', 'rb'), delimiter=',', quotechar='|')
+
+       csvfile = open(tweet, "r")
+       self.inpTweets = csv.reader(csvfile)
+
+       self.list = qlistwidget
+
+       warnings.filterwarnings("ignore", category=DeprecationWarning)
+
+    #start getStopWordList
+    def getStopWordList(self,stopWordListFileName):
+        #read the stopwords file and build a list
+        stopWords = []
+        stopWords.append('AT_USER')
+        stopWords.append('URL')
+
+        fp = open(stopWordListFileName, 'r')
+        line = fp.readline()
+        while line:
+            word = line.strip()
+            stopWords.append(word)
+            line = fp.readline()
+        fp.close()
+        return stopWords
+    #end
+
+    #memulai filter tweet
+    def processTweet(self,tweet):
+        # process the tweets
+
+        # menganti kata kapital menjadi kecil
+        tweet = tweet.lower()
+    
+        # menhapus kata https://* dan www.*
+        tweet = re.sub('((www\.[^\s]+)|(https?://[^\s]+))','',tweet)
+
+        # meghapus @usename
+        tweet = re.sub('@[^\s]+','',tweet)
+
+        # menghilangkan spasi
+        tweet = re.sub('[\s]+', ' ', tweet)
+
+        # menghilangkan hastag
+        #tweet = re.sub(r'#([^\s]+)', r'\1', tweet)
+        tweet = re.sub(r'#([^\s]+)', '', tweet)
+
+        # potong
+        tweet = tweet.strip('\'"')
+
+        # menghilangkan kata kata unicode untuk emoticon
+        tweet = tweet.encode('ascii', 'ignore').decode('unicode_escape')
+
+        tweet =  re.sub(r'\w+:\/{2}[\d\w-]+(\.[\d\w-]+)*(?:(?:\/[^\s/]*))*', '', tweet)
+
+        myre = re.compile(u'['
+                    u'\U0001F300-\U0001F5FF'
+                    u'\U0001F600-\U0001F64F'
+                    u'\U0001F680-\U0001F6FF'
+                    u'\u2600-\u26FF\u2700-\u27BF]+', 
+                    re.UNICODE)
+
+        # menghilangkan unicode
+        tweet = myre.sub('', tweet)
+
+        # menghilangkan username
+        #tweet = ' '.join(re.sub("(@[A-Za-z0-9]+)|([^0-9A-Za-z \t])|(\w+:\/\/\S+)"," ",tweet).split())
+    
+        return tweet
+    #akhir
+
+    #emlalkukan preprocessing t4erhadap data yang digunakan
+    def preprocessingData(self,tweet, stopwords):
+        self.cetak("Tweet bersih : " + tweet)
+
+        # mempersiapkan varible pembantu
+        featureList = []
+        tmpFeature = []
+
+        # mempersiapkan api untuk menjadalankan preprocessing dari tokenizer dan steamming
+        nltktokenizer = TweetTokenizer()
+        factorysteammer = StemmerFactory()
+        stemmer = factorysteammer.create_stemmer()
+
+        #proses tokenizer
+        self.cetak("Hasil Tokenization :")
+        featureList = nltktokenizer.tokenize(tweet)
+        self.cetak(str(featureList))
+
+        # menghilangkan kata stopwords
+        self.cetak("Hasil filter Stopwords :")
+        for w in featureList:
+            if w not in stopwords:
+                tmpFeature.append(w)
+    
+        featureList = tmpFeature
+        self.cetak(str(featureList))
+        tmpFeature = []
+
+        # proses steamming perkata agar mendapatkan kata baku
+        self.cetak("Hasil Stemming perkata:")
+        for w in featureList:
+            tmpFeature.append(stemmer.stem(w))
+
+        featureList = tmpFeature
+        self.cetak(str(featureList))
+        tmpFeature = []
+
+        self.cetak("")
+
+        return featureList
+
+    # vectorizer
+    def TFIDF(self,tweet): 
+        vectorizer = TfidfVectorizer(min_df = 5, max_df = 0.8, sublinear_tf = True, use_idf = True)
+
+        tmpTfidf = vectorizer.fit_transform(tweet)
+
+        return tmpTfidf
+
+    #persamaan svm untuk melakukan predik
+    def persamaanSVM(self, X):
+        return self.svmsebelumpso.predict_log_proba(X)
+
+    #menyimpan mode4l presintence dari svm untuk dilakukan testing di website
+    def exportModel(self,filename, featurelist):
+        with open('featurelist.txt', 'a') as f:
+            self.cetak("Mengeluarkan perhitungan dalam bentuk PKL :")
+            pickle.dump(self.svm, open(filename, 'wb'))
+            self.cetak(''.join(['Selesai training model disimpan dalam ', os.path.dirname(__file__) ,'\\', filename]))
+            
+            self.cetak("Mengeluarkan Feature List dalam bentuk TXT :")
+
+            for i, feature in enumerate(featurelist):
+                for a in featurelist[feature]:
+                    print(a)
+                    f.write(''.join([a,",", feature]))
+                    f.write("\n")
+
+            self.cetak(''.join(['Selesai Feature List disimpan dalam ', os.path.dirname(__file__) , '\\','featurelist.txt']))                
+
+
+    #function untuk menjalankan pso
+    def runpso(self, particles,label):
+
+        swarm = {
+            positive : [], 
+            negative : [],
+            neutral : []
+            }
+
+        temp = []
+
+        #preparing data for pso particle, append in one variable particle pso
+        for index, value in enumerate(particles):
+            indexClass = [i for i, no in enumerate(self.svmsebelumpso.classes_) if no == label[index]]
+
+            print(self.svmsebelumpso.coef_[indexClass])
+
+            partic = Particle.Particle(
+                particles[index], 
+                index, 
+                self.svmsebelumpso, 
+                [i for i, no in enumerate(self.svmsebelumpso.classes_) if no == label[index]],
+                self.svmsebelumpso.coef_[indexClass][0]
+            )
+
+            swarm[label[index]].append(partic)
+
+            print(label[index])
+            print(partic)
+
+            temp.append(partic)
+
+        for step in range(3):
+            self.cetak("--- Iterasi PSO : " + str(step + 1) + "---")
+
+            hasilkedua = self.pso(swarm)
+
+            svmPertama = copy.deepcopy(self.svmStandard)
+            svmPertama.fit(self.xsplit, self.y)
+
+            svmKedua = copy.deepcopy(self.svmStandard)
+            svmKedua.fit(hasilkedua, self.y)
+
+            scorekedua = svmKedua.score(self.x1, self.label)
+            scorepertama = svmPertama.score(self.x1, self.label)
+
+            self.cetak(str(scorekedua) + ' > ' + str(scorepertama))
+
+            #perbandingan akurasi pada kedua svm memiliki akurasi dibandingkan sebelumnya atau tidak
+            if scorekedua > scorepertama:
+                self.cetak("Hasil Perbaikan Parameter diterima")
+                self.X = copy.deepcopy(hasilkedua)    
+            else:
+                self.cetak("Hasil yang terdapat pada PSO tidak dapat digunakan")
+
+    def pso(self, swarm):
+        #do pso litetation 
+        temp = copy.deepcopy(self.xsplit)
+
+        # perubahan particle berdasarkan feature mereka
+        for indexswarm, valueswarm in enumerate(swarm):
+            #persiapan variable yang digunakan untuk keperluan pso
+            swarm[valueswarm] = sorted(swarm[valueswarm])
+            indexvalue = [i for i, no in enumerate(self.svmsebelumpso.classes_) if no == valueswarm]
+            weight = self.svmsebelumpso.class_weight_[indexvalue][0]
+
+            gbest = None
+
+            globalBest = []
+
+            #penentuan gbest bedasarkan hasil dari akumulasi persamaan svm
+            for indexpbest, particlepbest in enumerate(swarm[valueswarm]):
+                pbest = self.svmsebelumpso.decision_function(particlepbest.position)[0][indexvalue]
+                print(pbest)
+                if (gbest == None) :
+                    gbest = pbest
+                    globalBest = swarm[valueswarm][indexpbest]  
+                    self.solution = globalBest
+                elif (pbest >= gbest):
+                    gbest = pbest
+                    globalBest = swarm[valueswarm][indexpbest]  
+                    self.solution = globalBest
+
+            #perubahan pada particle swarm
+            for particle in swarm[valueswarm]:
+                particle.updateParticle(globalBest.getPositionList(), weight)
+                
+            swarm[valueswarm] = sorted(swarm[valueswarm])
+            
+            #Print swarm
+            for particle in swarm[valueswarm]:     
+                temp[particle.index] = particle.position
+
+        return temp
+
+    # run program pemanggilan data
+    def run(self):
+        self.daftarTweet = list(self.inpTweets)
+
+        #'''
+
+        tweetsplit =  self.split(self.daftarTweet, round(len(self.daftarTweet) / 3))
+
+        for i in range(len(tweetsplit)):
+            print("================================================")
+            print("================================================")
+            print("================================================")
+            print("================================================")
+
+            self.training(tweetsplit, i)
+
+            print("================================================")
+            print("================================================")
+            print("================================================")
+            print("================================================")
+
+            break
+
+        # '''
+
+
+        
+
+    def training(self, tweet, fold):
+
+        tweettesting = tweet[fold]
+        tweettraining1 = tweet[:fold] + tweet[fold + 1 :]
+        tweettraining = tweettraining1[0]
+
+        for data in list(tweettraining1[1:]):
+            tweettraining.extend(data)
+
+        print(len(tweettraining))
+
+        self.cetak("")
+        self.cetak("-------------- mempersiapkan variable ------------------")
+        self.cetak("")
+
+        global positive
+        global negative
+        global neutral
+
+        tweets = []
+
+        self.x1 = []
+        self.svmStandard = svm.SVC(C=1.0, cache_size=200, class_weight=None, coef0=0.0,
+            decision_function_shape="ovr", degree=3, gamma='auto', kernel='linear',
+            max_iter=-1, probability=False, random_state=None, shrinking=True,
+            tol=0.001, verbose=False)
+
+        self.tfidfDocument = tfidf.TfIdf()
+
+        self.cetak("-------------- Persiapan Telah Selesai ------------------")
+        self.cetak("")
+        self.cetak("-------------- preprocessing ------------------")
+        self.cetak("")
+        
+
+        # start loop
+        for i, row in enumerate(tweettraining):
+            sentiment = row[0].replace('|','')
+            tweet = row[1].replace('|', '')
+
+            self.cetak(''.join(["Preprocessing data ke ", str(i + 1)," tweet : ", tweet]))
+
+            #tahap preprocessing
+            processedTweet = self.processTweet(tweet)
+            featureVector = self.preprocessingData(processedTweet, self.stopWords)
+            tweets.append((featureVector, sentiment))
+
+             # tahap binary
+            self.tfidfDocument.add_document(i,featureVector)
+
+            if (sentiment == positive ):
+                document[positive].append(tweet)
+
+                for feature in featureVector:
+                    featurelist[positive].append(feature)
+
+                featurelist[positive] = list(set(featurelist[positive]))
+
+                label.append(positive)
+
+            if (sentiment == negative ):
+                document[negative].append(tweet)
+
+                for feature in featureVector:
+                   featurelist[negative].append(feature)
+
+                featurelist[negative] = list(set(featurelist[negative]))
+
+                label.append(negative)
+
+            if (sentiment == neutral ):
+                document[neutral].append(tweet)
+
+                for feature in featureVector:
+                   featurelist[neutral].append(feature)
+
+                featurelist[neutral] = list(set(featurelist[neutral]))
+
+                label.append(neutral)
+        
+        # mendapatkan pembobotan menggunakan tf idf
+        for i, feature in enumerate(featurelist):
+            #self.cetak("generating tf idf per feature : ".join(feature))
+            tfidfresult[feature] = self.tfidfDocument.similarities(featurelist[feature])
+            
+            for x in tfidfresult[feature]:
+                tfidfweight[feature].append(x[1])
+
+        
+        self.cetak("")
+        self.cetak("-------------- perhitungan TF IDF ------------------")
+        self.cetak("")
+     
+        # merubah ke variable yang bisa diterima oleh svm
+        for i, row in enumerate(tfidfweight[positive]):
+            a = [tfidfresult[positive][i][1],tfidfresult[negative][i][1], tfidfresult[neutral][i][1]]
+            self.x1.append(a)
+            self.cetak("Hasil TF-IDF Tweet Ke - " + str(i))
+            self.cetak("Hasil TF-IDF : " + str(a))
+
+        #print(self.x1)
+
+        self.cetak("")
+        self.cetak("-------------- perhitungan SVM ------------------")
+        self.cetak("")
+
+        lentfidf = len(self.x1)
+
+        self.xsplit = []
+        self.y = []
+        self.label = label
+
+        self.parametersplit = self.split(self.x1, round(len(self.x1) / 10))
+        self.labelsplit = self.split(label, round(len(label) / 10))
+        
+        #for i in range(9):
+        for i in range(round(lentfidf * 9 / 10)):
+            self.xsplit.append(self.x1[i])
+            self.y.append(label[i])
+
+        self.X = copy.deepcopy(self.xsplit)
+        #self.y = label
+        
+        self.svmsebelumpso =  svm.SVC(C=1.0, cache_size=200, class_weight=None, coef0=0.0,
+            decision_function_shape="ovr", degree=3, gamma='auto', kernel='linear',
+            max_iter=-1, probability=True, random_state=None, shrinking=True,
+            tol=0.001, verbose=True)
+
+        #self.svmsebelumpso = copy.deepcopy(self.svmStandard)
+        self.svmsebelumpso.fit(self.xsplit, self.y)
+
+        '''
+
+        print hasil parameter
+
+        '''
+
+        decisionfunctionsebelumpso = self.svmsebelumpso.decision_function(self.x1)
+
+        #print("Decision Function")
+        print(decisionfunctionsebelumpso)
+        hasilprediksebelumpso = self.svmsebelumpso.predict(self.x1)
+        cmsebelumpso = confusion_matrix(label, hasilprediksebelumpso)
+
+        cmsebelumpso = confusion_matrix(label, hasilprediksebelumpso)
+        print(cmsebelumpso)
+        
+        fpr = dict()
+        tpr = dict()
+        roc_auc = dict()
+
+        label_binari = label_binarize(hasilprediksebelumpso, self.svmsebelumpso.classes_)
+
+        for i in range(3):
+            fpr[i], tpr[i], _ = roc_curve(label_binari[:, i], decisionfunctionsebelumpso [:, i])
+            roc_auc[i] = auc(fpr[i], tpr[i])
+
+        plt.figure()
+        lw = 2
+        plt.plot(fpr[2], tpr[2], color='darkorange',
+                 lw=lw, label='ROC curve (area = %0.2f)' % roc_auc[2])
+        plt.plot([0, 1], [0, 1], color='navy', lw=lw, linestyle='--')
+        plt.xlim([0.0, 1.0])
+        plt.ylim([0.0, 1.05])
+        plt.xlabel('False Positive Rate')
+        plt.ylabel('True Positive Rate')
+        plt.title('Receiver operating characteristic example')
+        plt.legend(loc="lower right")
+        plt.show()
+
+        '''
+        print(hasilprediksebelumpso)
+        print(self.svmsebelumpso.support_ )
+        print(self.svmsebelumpso.score(self.x1, label))
+        print(self.svmsebelumpso.classes_)
+        print(self.svmsebelumpso.support_vectors_)
+        print("cofisien for svm :")
+        print(self.svmsebelumpso.coef_)
+        print("dual cofisien for svm :")
+        print(self.svmsebelumpso.dual_coef_)
+        '''
+
+        self.cetak(''.join(str(e) + " " for e in self.svmsebelumpso.predict(self.x1)))
+
+        self.cetak("perhitungan akurasi terhadap keseluruhan data : ")
+        self.cetak(str(self.svmsebelumpso.score(self.x1, label)))
+
+        for i in range(len(self.parametersplit)):
+            self.cetak("".join(["perhitungan akurasi terhadap potongan ",str(i + 1), " data uji"]))
+            self.cetak(str(self.svmsebelumpso.score(self.parametersplit[i], self.labelsplit[i])))
+        
+
+        self.cetak("")
+        self.cetak("-------------- perhitungan optimasi dengan Particle Swarm Optimization ------------------")
+        self.cetak("")
+
+        #run pso
+        self.runpso(self.xsplit, self.y)
+
+        self.svm = copy.deepcopy(self.svmStandard)
+        self.svm.fit(self.X, self.y)
+        
+        '''
+
+        print hasil parameter
+
+        '''
+
+        #print(self.svm.decision_function(self.x1))
+        print(self.svm.predict(self.x1))
+        print(self.svm.support_vectors_ )
+        
+        self.cetak("perhitungan akurasi terhadap keseluruhan data : ")
+        self.cetak(str(self.svm.score(self.x1, label)))
+
+        for i in range(len(self.parametersplit)):
+            self.cetak("".join(["perhitungan akurasi terhadap potongan ",str(i + 1), " data uji"]))
+            self.cetak(str(self.svm.score(self.parametersplit[i], self.labelsplit[i])))
+        
+        self.cetak("")
+        self.cetak("-------------- selesai training data ------------------")
+        self.cetak("")
+        self.cetak("-------------- langkah export data ------------------")
+        self.cetak("")
+
+        self.exportModel('modelterbaru.pkl', featurelist)
+
+    def cetak(self, pesan):
+        print(pesan)
+        self.update.emit(pesan)
+
+    def split(self, arr, size):
+        arrs = []
+        while len(arr) > size:
+            pice = arr[:size]
+            arrs.append(pice)
+            arr   = arr[size:]
+        arrs.append(arr)
+        return arrs

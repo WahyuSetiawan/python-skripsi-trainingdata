@@ -36,6 +36,7 @@
     <Compile Include="sampleTweet.txt">
       <SubType>Code</SubType>
     </Compile>
+    <Compile Include="Utility\DocumentSimilarity-master\feature_extraction.py" />
     <Compile Include="Utility\PSO.py" />
     <Compile Include="Utility\Particle.py" />
     <Compile Include="Utility\tfidf.py" />
@@ -55,6 +56,8 @@
     <Folder Include="data\feature_list\" />
     <Folder Include="data\pantaidepok\" />
     <Folder Include="Module\" />
+    <Folder Include="Utility\DocumentSimilarity-master\" />
+    <Folder Include="Utility\DocumentSimilarity-master\.ipynb_checkpoints\" />
     <Folder Include="view\" />
     <Folder Include="View\" />
     <Folder Include="Utility\" />
@@ -64,6 +67,28 @@
     <Content Include="data\feature_list\id-stopwords.txt" />
     <Content Include="data\sampleTweets.csv" />
     <Content Include="data\sampleTweets.txt" />
+    <Content Include="Module\TextFile1.txt" />
+    <Content Include="Module\TextFile2.txt" />
+    <Content Include="Utility\DocumentSimilarity-master\.ipynb_checkpoints\Untitled-checkpoint.ipynb" />
+    <Content Include="Utility\DocumentSimilarity-master\16595-37036-1-PB.pdf" />
+    <Content Include="Utility\DocumentSimilarity-master\17167-37507-1-PB.pdf" />
+    <Content Include="Utility\DocumentSimilarity-master\17342-37530-1-PB.pdf" />
+    <Content Include="Utility\DocumentSimilarity-master\17526-37540-1-PB.pdf" />
+    <Content Include="Utility\DocumentSimilarity-master\17838-37545-1-PB.pdf" />
+    <Content Include="Utility\DocumentSimilarity-master\feature_extraction.py.bak" />
+    <Content Include="Utility\DocumentSimilarity-master\README.md" />
+    <Content Include="Utility\DocumentSimilarity-master\source.txt" />
+    <Content Include="Utility\DocumentSimilarity-master\source1.txt" />
+    <Content Include="Utility\DocumentSimilarity-master\source2.txt" />
+    <Content Include="Utility\DocumentSimilarity-master\source3.txt" />
+    <Content Include="Utility\DocumentSimilarity-master\source4.txt" />
+    <Content Include="Utility\DocumentSimilarity-master\source5.txt" />
+    <Content Include="Utility\DocumentSimilarity-master\source_raw_for_extraction.txt" />
+    <Content Include="Utility\DocumentSimilarity-master\stopwords.txt" />
+    <Content Include="Utility\DocumentSimilarity-master\term-frequency.csv" />
+    <Content Include="Utility\DocumentSimilarity-master\tf-idf.csv" />
+    <Content Include="Utility\DocumentSimilarity-master\untitled" />
+    <Content Include="Utility\DocumentSimilarity-master\Untitled.ipynb" />
     <Content Include="__init__.py">
       <SubType>Code</SubType>
     </Content>
