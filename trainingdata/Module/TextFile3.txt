@@ -222,6 +222,45 @@ class TrainingData:
 
             temp.append(partic)
 
+        '''
+        for step in range(1):
+            hasilkedua = self.pso(swarm, trainingweight, svm)
+
+            svmKedua = copy.deepcopy(self.svm_standard)
+            svmKedua.fit(hasilkedua, traininglabel)
+
+            scorekedua = svmKedua.score(trainingweight, traininglabel)
+
+            '''
+
+        '''
+            self.cetak("--- Iterasi PSO : " + str(step + 1) + "---")
+            
+            svmPertama = copy.deepcopy(self.svm_standard)
+            svmPertama.fit(trainingweight, traininglabel)
+            
+            scorepertama = svmPertama.score(testingweight, testinglabel)
+            
+            self.cetak(str(round(scorekedua * 100, 2)) + ' > ' + str(round(scorepertama * 100, 2)))
+
+            #perbandingan akurasi pada kedua svm memiliki akurasi dibandingkan sebelumnya atau tidak
+            if scorekedua > scorepertama:
+                self.cetak("Hasil Perbaikan Parameter diterima")
+
+                weighthasilpso = copy.deepcopy(hasilkedua)    
+#                trainingweight = copy.deepcopy(hasilkedua) 
+            else:
+                self.cetak("Hasil yang terdapat pada PSO tidak dapat digunakan")
+
+                
+        if pso_tertinggi < scorekedua:
+            pso_tertinggi = scorekedua
+            pso_weight = hasilkedua     
+            
+            print(scorekedua)
+
+            '''
+
         hasilkedua = self.pso(swarm, trainingweight, svm)
         
         svmKedua = copy.deepcopy(self.svm_standard)
@@ -307,11 +346,6 @@ class TrainingData:
                     positive : [], 
                     negative : [],
                     neutral : []
-                    }        
-        featurelist_test = {
-                    positive : [], 
-                    negative : [],
-                    neutral : []
                     }
         document = {
                     positive : [], 
@@ -333,10 +367,10 @@ class TrainingData:
         self.cetak("-------------- preprocessing ------------------")
         self.cetak("")
 
-        tweet_data_training, tweet_data_test, tweet_label_training, tweet_label_test = train_test_split(daftar_tweet, daftar_label, test_size = 0.10, random_state = 0)
+        tweet_data_training, tweet_data_test, tweet_label_training, tweet_label_test = train_test_split(daftar_tweet, daftar_label, test_size = 0.05, random_state = 0)
 
         tfidf_perhitungan, featurelist = self.preprocessing(tweet_data_training, tweet_label_training)
-        tfidf_perhitungan_test, featurelist_test = self.preprocessing(tweet_data_test, tweet_label_test)
+        tfidf_perhitungan_test, featurelist_test = self.preprocessing(tweet_data_test, tweet_data_test)
 
         '''
 
@@ -371,6 +405,7 @@ class TrainingData:
         self.cetak("Hasil score testing terhadap data testing sebelum PSO: ")
         self.cetak(svm_sebelumpso.score(svm_bobot_test, tweet_label_test) * 100)
         self.cetak("")
+        self.cetak("")
 
         '''
 
@@ -378,7 +413,7 @@ class TrainingData:
 
         '''
         
-        self.printEvaluasi1(svm_sebelumpso, svm_bobot_split, tweet_labels_split)
+        self.printEvaluasi(svm_sebelumpso, svm_bobot_fold, svm_label_fold)
 
         self.cetak("")
         self.cetak("-------------- Perhitungan optimasi dengan Particle Swarm Optimization ------------------")
@@ -393,13 +428,13 @@ class TrainingData:
             svm_pso_tertinggi = copy.deepcopy(self.svm_standard)
             svm_pso_tertinggi.fit(pso_tertinggi, tweet_labels_split)
 
-            pso_score = accuracy_score(svm_pso_tertinggi.predict(pso_tertinggi), tweet_labels_split)
-
-            if  pso_score > svm_sebelumpso.score(svm_bobot_split, tweet_labels_split):
+            if accuracy_score(svm_pso_tertinggi.predict(pso_tertinggi), tweet_labels_split) > svm_sebelumpso.score(svm_bobot_split, tweet_labels_split):
                 break
 
-            if pso_score >= 1:
-                break
+        '''
+        svm_setelahpso = copy.deepcopy(self.svm_standard)
+        svm_setelahpso.fit(pso_bobot, tweet_labels_split)
+        '''
 
         svm_pso_tertinggi = copy.deepcopy(self.svm_standard)
         svm_pso_tertinggi.fit(pso_tertinggi, tweet_labels_split)
@@ -407,11 +442,23 @@ class TrainingData:
         self.cetak("Hasil score testing terhadap data testing setelah PSO : ")
         self.cetak(svm_pso_tertinggi.score(svm_bobot_test, tweet_label_test) * 100)
         self.cetak("")
+        self.cetak("")
+        
+        '''
+
+        print hasil parameter
 
         '''
-        
-        pritn hasil evaluasi dari data
+        '''
+        self.printEvaluasi(svm_setelahpso, svm_bobot_fold, svm_label_fold)
+        self.cetak("")
+        self.cetak("")
+        self.cetak("")
+        self.cetak("Evaluasi data training setelah PSO")
+        self.cetak("")
 
+        print(len(svm_bobot_split))
+        print(len(pso_tertinggi))
         '''
 
         self.printEvaluasi1(svm_pso_tertinggi, pso_tertinggi, tweet_labels_split)
@@ -422,32 +469,7 @@ class TrainingData:
         self.cetak("-------------- langkah export data ------------------")
         self.cetak("")
 
-        self.cetak("Banyaknya data  :")
-        self.cetak("Data Training   :")
-        self.cetak(len(tweet_data_training))
-        self.cetak("Data Testing    :")
-        self.cetak(len(tweet_data_test))
-
-        featuretest = copy.deepcopy(featurelist_test)
-
-        for i, feature in enumerate(featurelist):
-            featuretest[feature].extend(featurelist[feature])
-
-            featuretest[feature] = list(set(featuretest[feature]))
-
-            for entities in featurelist[feature]:
-                featuretest[feature].remove(entities)
-
-            self.cetak("".join(["Banyaknya feature training ", str(feature)]))
-            self.cetak(len(featurelist[feature]))
-            self.cetak("".join(["Banyaknya feature testing ", str(feature)]))
-            self.cetak(len(featurelist_test[feature]))
-            self.cetak("".join(["Banyaknya selisih feature ", str(feature)]))
-            self.cetak(len(featuretest[feature]))
-            print(featuretest[feature])
-
         self.exportModel(svm_pso_tertinggi, 'modelterbaru.pkl', featurelist)
-
 
     def preprocessing(self, tweet, label):
         tweets = []
