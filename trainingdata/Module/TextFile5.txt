@@ -287,7 +287,7 @@ class TrainingData:
 
     # run program pemanggilan data
     def run(self):
-        testingpersen = 0
+        testingpersen = 0.10
 
         self.daftarTweet = list(self.inpTweets)
 
@@ -541,7 +541,7 @@ class TrainingData:
         for i, data in enumerate(featurelist):
             featurelist[data] = list(set(featurelist[data]))
 
-        return tfidf_perhitungan, featurelist
+        return tweets, featurelist
 
     def perhitungantfidf(self, tfidf_perhitungan, featurelist):    
         tfidf_result = {
@@ -558,7 +558,23 @@ class TrainingData:
 
         svm_bobot = []
 
+        tfidfwkwk = tfidf.TfIdf()
+
+        tfidfwkwk.add_document(positive, featurelist[positive])
+        tfidfwkwk.add_document(negative, featurelist[negative])
+        tfidfwkwk.add_document(neutral, featurelist[neutral])
+
+
+        for i, feature in enumerate(tfidf_perhitungan):
+            print(feature)
+            b = tfidfwkwk.similarities(feature[0])
+            self.cetak(b)
+            a = [b[0][1],b[1][1],b[2][1]]
+            svm_bobot.append(a)
+
+
         # mendapatkan pembobotan menggunakan tf idf
+        '''
         for i, feature in enumerate(featurelist):
             #self.cetak("generating tf idf per feature : ".join(feature))
             tfidf_result[feature] = tfidf_perhitungan.similarities(featurelist[feature])
@@ -577,6 +593,7 @@ class TrainingData:
             svm_bobot.append(a)
             self.cetak("Hasil TF-IDF Tweet Ke - " + str(i + 1))
             self.cetak("Hasil TF-IDF : " + str(a))
+        '''
 
         return svm_bobot
 
